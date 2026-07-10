@@ -28,3 +28,6 @@ You are a Privacy Systems Architect. Implement a coordinated local image protect
   }
   ```
 - Ensure the original image is NEVER modified. Always clone canvas buffers before applying visual masks.
+- Enforce environment-safe canvas conversion: Any image-to-canvas extraction routine must detect whether it is executing inside the Content Script or the Service Worker context, falling back to `createImageBitmap` and `OffscreenCanvas` in the background thread.
+- Reference the shared, consolidated configuration defaults (`defaults.js`) to prevent parameters schema drift between storage instantiation, settings updates, and background logic runs.
+

@@ -10,3 +10,6 @@ You are an expert Frontend Integration Engineer. Implement an upload interceptio
 - Re-inject files utilizing a `DataTransfer` object.
 - Provide observer hooks to easily link to an external scan approval pipeline.
 - Include a binding registry memory purging routine (using `element.isConnected`) to prevent memory leaks in dynamic Single Page Applications.
+- Cache the event interceptor callback functions at the module scope level rather than recreating closures inside mutation observer sweeps to prevent memory leaks on dynamic DOM nodes.
+- Dispatch parallel statistics reports and await their completion using `Promise.all` before completing the file upload interception event.
+
