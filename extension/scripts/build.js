@@ -64,6 +64,7 @@ async function runBuild() {
           fileName: () => 'background/serviceWorker.js',
         },
         rollupOptions: {
+          external: [], // Force rollup to bundle all npm dependencies for Chrome Extensions compatibility
           output: {
             entryFileNames: 'background/serviceWorker.js',
           },
@@ -90,6 +91,7 @@ async function runBuild() {
           fileName: () => 'content/contentScript.js',
         },
         rollupOptions: {
+          external: [], // Force rollup to bundle all dependencies inside the IIFE wrapper
           output: {
             entryFileNames: 'content/contentScript.js',
             extend: true,
@@ -124,6 +126,18 @@ async function runBuild() {
       console.log('Copying opencv.js to dist/... (this may take a moment)');
       fs.copyFileSync(opencvSrc, opencvDest);
       console.log('Successfully copied opencv.js to dist/');
+    }
+
+    const tesseractSrc = resolve(publicDir, 'tesseract');
+    const tesseractDest = resolve(distDir, 'tesseract');
+    if (fs.existsSync(tesseractSrc)) {
+      console.log('Copying tesseract files to dist/...');
+      fs.mkdirSync(tesseractDest, { recursive: true });
+      const files = fs.readdirSync(tesseractSrc);
+      for (const file of files) {
+        fs.copyFileSync(resolve(tesseractSrc, file), resolve(tesseractDest, file));
+      }
+      console.log(`Successfully copied ${files.length} tesseract files to dist/tesseract/`);
     }
 
     console.log('\nSafeLens Extension build completed successfully!');
