@@ -60,15 +60,17 @@ export async function blurCanvasRegions(canvas, regions, blurRadius = 15) {
 
       // 2. Configure original canvas clipping region to restrict blur leakage
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(drawX, drawY, drawW, drawH);
-      ctx.clip();
+      try {
+        ctx.beginPath();
+        ctx.rect(drawX, drawY, drawW, drawH);
+        ctx.clip();
 
-      // 3. Draw sub-region back with GPU-accelerated Gaussian Blur filter
-      ctx.filter = `blur(${blurRadius}px)`;
-      ctx.drawImage(tempCanvas, drawX, drawY);
-      
-      ctx.restore(); // Restore clipping context
+        // 3. Draw sub-region back with GPU-accelerated Gaussian Blur filter
+        ctx.filter = `blur(${blurRadius}px)`;
+        ctx.drawImage(tempCanvas, drawX, drawY);
+      } finally {
+        ctx.restore(); // Restore clipping context
+      }
     });
 
   } catch (error) {

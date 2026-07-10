@@ -67,6 +67,6 @@ export async function redactImageRegions(canvas, regions, mode = 'redact') {
   if (mode === 'blur') {
     return blurCanvasRegions(canvas, regions, 8);
   } else {
-    return redactCanvasRegions(canvas, regions, { fillStyle: '#000000' });
+    return redactCanvasRegions(canvas, regions, 'redact', { fillStyle: '#000000' });
   }
 }

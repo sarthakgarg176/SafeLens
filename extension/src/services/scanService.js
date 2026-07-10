@@ -24,34 +24,47 @@ import { analyzeRisk } from '../ai/detection/riskAnalyzer.js';
  */
 
 /**
- * Converts a browser File object to an HTMLCanvasElement populated with image pixels.
+ * Converts a browser File object to a canvas populated with image pixels.
+ * Supports both Content Script and Service Worker execution environments.
  * 
  * @param {File} file - Source image File
- * @returns {Promise<HTMLCanvasElement>} Loaded canvas
+ * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Loaded canvas
  */
-export function fileToCanvas(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      return reject(new TypeError('File parameter is required'));
-    }
+export async function fileToCanvas(file) {
+  if (!file) {
+    throw new TypeError('File parameter is required');
+  }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas);
+  if (typeof document === 'undefined') {
+    // Service Worker Context (offscreen image processing)
+    const arrayBuffer = await file.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: file.type || 'image/png' });
+    const imageBitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imageBitmap, 0, 0);
+    return canvas;
+  } else {
+    // Web Page DOM / Content Script Context
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas);
+        };
+        img.onerror = (e) => reject(new Error(`Failed to decode image pixels: ${e}`));
+        img.src = event.target.result;
       };
-      img.onerror = (e) => reject(new Error(`Failed to decode image pixels: ${e}`));
-      img.src = event.target.result;
-    };
-    reader.onerror = (e) => reject(new Error(`Failed to read file buffer: ${e}`));
-    reader.readAsDataURL(file);
-  });
+      reader.onerror = (e) => reject(new Error(`Failed to read file buffer: ${e}`));
+      reader.readAsDataURL(file);
+    });
+  }
 }
 
 /**

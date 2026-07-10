@@ -12,17 +12,10 @@
  * - extension/src/popup/Popup.jsx & Settings.jsx (Consumes these wrapper methods)
  */
 
+import { DEFAULT_SETTINGS } from '../config/defaults.js';
+
 const SETTINGS_KEY = 'settings';
 const SCANS_KEY = 'scans';
-
-// Default settings applied if none exist in storage
-const DEFAULT_SETTINGS = {
-  protectionEnabled: true,
-  blurMode: 'redact',
-  watermarkEnabled: false,
-  aiCloakEnabled: false,
-  riskLevelThreshold: 'medium',
-};
 
 // Mock data used strictly as a placeholder when no real scans exist yet
 const PLACEHOLDER_SCAN = {

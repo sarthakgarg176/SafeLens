@@ -11,31 +11,11 @@ try {
   console.error('[ServiceWorker] Failed to load OpenCV.js:', err);
 }
 
-import { routeMessage } from './messageRouter.js';
+import { DEFAULT_SETTINGS } from '../config/defaults.js';
 
-/**
- * SafeLens Background Service Worker
- * 
- * Responsibility:
- * - Coordinates the lifecycle events (installation, updates) of the extension.
- * - Seeds default configuration settings in chrome storage on install.
- * - Handles runtime extension messaging, delegating to the central MessageRouter.
- * 
- * Interacts with:
- * - extension/src/background/messageRouter.js (Delegates message resolution)
- * - chrome.storage (Initializes settings configuration)
- */
-
-// Default settings applied on extension initialization
-const DEFAULT_SETTINGS = {
-  protectionEnabled: true,
-  riskLevelThreshold: 'medium', // low, medium, high
-  autoRedact: false,
-  autoProtect: false,
-  watermarkEnabled: false,
-  aiCloakEnabled: false,
-  allowedDomains: []
-};
+// Dynamically import message router to prevent ESM hoisting race conditions where
+// messageRouter would be evaluated before self.Module/opencv is loaded into global scope.
+const { routeMessage } = await import('./messageRouter.js');
 
 /**
  * Handle Extension installation or updates

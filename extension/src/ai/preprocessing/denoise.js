@@ -3,7 +3,7 @@
  * 
  * Responsibility:
  * - Smooths high-frequency noise, speckles, and scanner halftone patterns in document images.
- * - Uses OpenCV `cv.GaussianBlur` to provide extremely fast, low-latency smoothing (<10ms).
+ * - Uses OpenCV `cv.GaussianBlur` to provide fast smoothing of image noise.
  * - Explicitly releases WebAssembly Mat buffers to avoid memory leaks.
  * - Gracefully skips and returns the original image on filter failure.
  * 
@@ -17,8 +17,8 @@
 
 /**
  * Denoises a canvas by applying a light spatial Gaussian filter using OpenCV.js.
- * We choose Gaussian Blur over Bilateral Filter because it takes under 10ms (vs >200ms),
- * which is critical for meeting our 300ms latency budget while still removing character edge noise.
+ * We choose Gaussian Blur over Bilateral Filter because of its lower computational cost,
+ * which is helpful for meeting our latency budget while still removing character edge noise.
  * 
  * @param {HTMLCanvasElement|OffscreenCanvas} canvas - Source image canvas
  * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Denoised canvas

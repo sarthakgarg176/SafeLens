@@ -104,6 +104,13 @@ function createInterceptor(type) {
   };
 }
 
+// Module-level cache of static interceptors to prevent creating redundant closures
+const INTERCEPTORS = {
+  change: createInterceptor('change'),
+  drop: createInterceptor('drop'),
+  paste: createInterceptor('paste')
+};
+
 /**
  * Safe dragover interceptor to allow drop events.
  */
@@ -158,20 +165,20 @@ function scanAndBind(root) {
   // 1. Scan and bind file inputs
   const inputs = root.querySelectorAll('input[type="file"]');
   inputs.forEach((input) => {
-    bindListener(input, 'change', createInterceptor('change'));
+    bindListener(input, 'change', INTERCEPTORS.change);
   });
 
   // 2. Scan and bind dropzones (common containers and role buttons)
   const dropzones = root.querySelectorAll('[class*="drop"], [class*="upload"], [id*="drop"], [id*="upload"], [role="button"]');
   dropzones.forEach((dz) => {
     bindListener(dz, 'dragover', handleDragOver);
-    bindListener(dz, 'drop', createInterceptor('drop'));
+    bindListener(dz, 'drop', INTERCEPTORS.drop);
   });
 
   // 3. Scan and bind editable areas (textareas, contenteditables)
   const editables = root.querySelectorAll('textarea, [contenteditable="true"]');
   editables.forEach((ed) => {
-    bindListener(ed, 'paste', createInterceptor('paste'));
+    bindListener(ed, 'paste', INTERCEPTORS.paste);
   });
 }
 
@@ -205,10 +212,10 @@ export function initialize() {
   }
 
   // 3. Register global fallbacks on document to cover dynamic attachments not matched by queries
-  bindListener(document, 'change', createInterceptor('change'));
+  bindListener(document, 'change', INTERCEPTORS.change);
   bindListener(document, 'dragover', handleDragOver);
-  bindListener(document, 'drop', createInterceptor('drop'));
-  bindListener(document, 'paste', createInterceptor('paste'));
+  bindListener(document, 'drop', INTERCEPTORS.drop);
+  bindListener(document, 'paste', INTERCEPTORS.paste);
 }
 
 /**

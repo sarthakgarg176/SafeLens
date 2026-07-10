@@ -89,31 +89,33 @@ async function runPipeline(files, settings) {
     files.map(file => protectImagePipeline(file, settings))
   );
 
-  // Log scan results to populate local statistics history
-  results.forEach(async (res) => {
-    if (!res.success) return;
+  // Log scan results to populate local statistics history in parallel
+  await Promise.all(
+    results.map(async (res) => {
+      if (!res.success) return;
 
-    try {
-      const maxConfidence = res.detections.reduce((max, d) => Math.max(max, d.fusedConfidence || 0), 0) || 0.8;
-      
-      await chrome.runtime.sendMessage({
-        type: 'LOG_SCAN',
-        payload: {
-          scanId: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          fileName: res.originalFile.name,
-          size: res.originalFile.size,
-          riskLevel: res.risk,
-          confidence: parseFloat(maxConfidence.toFixed(2)),
-          piiCount: res.detections.length,
-          processingTime: res.protectionSummary.processingTime,
-          status: res.protectionSummary.redacted ? 'protected' : 'passed',
-          detections: res.detections
-        }
-      });
-    } catch (e) {
-      console.warn('[UploadInterceptor] Failed to log scan result:', e);
-    }
-  });
+      try {
+        const maxConfidence = res.detections.reduce((max, d) => Math.max(max, d.fusedConfidence || 0), 0) || 0.8;
+        
+        await chrome.runtime.sendMessage({
+          type: 'LOG_SCAN',
+          payload: {
+            scanId: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            fileName: res.originalFile.name,
+            size: res.originalFile.size,
+            riskLevel: res.risk,
+            confidence: parseFloat(maxConfidence.toFixed(2)),
+            piiCount: res.detections.length,
+            processingTime: res.protectionSummary.processingTime,
+            status: res.protectionSummary.redacted ? 'protected' : 'passed',
+            detections: res.detections
+          }
+        });
+      } catch (e) {
+        console.warn('[UploadInterceptor] Failed to log scan result:', e);
+      }
+    })
+  );
 
   return results;
 }

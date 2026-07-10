@@ -55,10 +55,10 @@ export async function deskewCanvas(canvas) {
     // 3. Extract Canny edges
     cv.Canny(gray, edges, 50, 200, 3);
 
-    // 4. Run Hough Transform.
+    // Run Hough Transform.
     // Probabilistic Hough lines (HoughLinesP) is selected over standard Hough lines (HoughLines)
     // because it samples random points rather than calculating every single accumulator bin,
-    // reducing processing time from >120ms to under 15ms.
+    // reducing processing complexity.
     cv.HoughLinesP(edges, lines, 1, Math.PI / 180, 100, 50, 10);
 
     let angleSum = 0;

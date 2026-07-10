@@ -12,4 +12,6 @@ You are a Graphics Programmer. Write canvas manipulation routines to redact targ
   2. **Gaussian Blur**: Localized GPU-accelerated blur using context filters (`ctx.filter = 'blur(Xpx)'`) restricted to clipping bounds.
   3. **Pixelate**: Group pixels into scale block cells (e.g. 8x8) and average colors.
 - Maintain full support for high-resolution images (up to 4K) without memory leaks.
+- Enforce pairing of canvas context state modifications: Wrap drawing operations inside `ctx.save()` / `ctx.restore()` in a `try...finally` block to prevent context leakage or state corruption if an exception occurs mid-render.
+
 

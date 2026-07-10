@@ -54,6 +54,7 @@ async function runBuild() {
       root: extDir,
       publicDir: false,
       build: {
+        target: 'esnext',
         outDir: distDir,
         emptyOutDir: false,
         minify: 'esbuild',
@@ -67,6 +68,7 @@ async function runBuild() {
           external: [], // Force rollup to bundle all npm dependencies for Chrome Extensions compatibility
           output: {
             entryFileNames: 'background/serviceWorker.js',
+            chunkFileNames: 'background/[name]-[hash].js',
           },
         },
       },

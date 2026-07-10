@@ -1,3 +1,7 @@
+import { preprocessImage } from '../ai/preprocessing/preprocessImage.js';
+import { protectImagePipeline } from '../services/protectService.js';
+import { bridgeClient } from '../communication/bridgeClient.js';
+
 /**
  * Central Message Router for SafeLens Background Service Worker
  * 
@@ -23,9 +27,6 @@
  * @property {*} [data] - The return data of the operation on success
  * @property {string} [error] - The error message on failure
  */
-import { preprocessImage } from '../ai/preprocessing/preprocessImage.js';
-import { protectImagePipeline } from '../services/protectService.js';
-import { bridgeClient } from '../communication/bridgeClient.js';
 
 /**
  * Registry of message handlers
@@ -159,7 +160,6 @@ const handlers = {
 
 /**
  * Poll-awaits OpenCV WASM initialization in the background thread.
- * Timeout triggers after 5 seconds to prevent execution hangs.
  * 
  * @returns {Promise<void>} Resolves when global cv object is loaded and parsed
  */
