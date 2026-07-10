@@ -2,52 +2,78 @@
  * Confidence Fusion Engine
  * 
  * Responsibility:
- * - Fuses pattern matches (Regex) and contextual classifications (MiniLM) into a unified result.
- * - Resolves overlapping risk findings.
- * - Computes a weighted overall confidence score for each risk element.
+ * - Combines pattern matching confidence and character recognition confidence.
+ * - Filters out false positives by discarding matches where validation rules failed.
+ * - Computes a unified Bayesian-style confidence rating.
+ * - Formats standard output payloads.
  * 
  * Input/Output Contract:
- * - Input: regexDetections (Object[]), modelClassifications (Object[])
- * - Output: Object[] (List of fused findings containing adjusted confidence levels)
+ * - Input: Object[] (Detections with rule validation metadata)
+ * - Output: Object[] (Detections containing fused confidence scores)
  * 
  * Interacts with:
- * - extension/src/ai/detection/riskAnalyzer.js (Aggregates and formats findings)
+ * - extension/src/ai/detection/regexDetector.js & ruleEngine.js (Consumes their attributes)
  */
 
+// Severity weights mapped to PII types
+const SEVERITY_LEVELS = {
+  EMAIL: 'medium',
+  PHONE: 'low',
+  AADHAAR: 'high',
+  PAN: 'high',
+  PASSPORT: 'high',
+  DRIVING_LICENSE: 'high',
+  IFSC: 'medium',
+  CREDIT_CARD: 'critical',
+  UPI_ID: 'medium',
+  AWS_ACCESS_KEY: 'critical',
+  GOOGLE_API_KEY: 'critical',
+  GITHUB_PAT: 'critical',
+  JWT_TOKEN: 'critical',
+  PASSWORD_PATTERNS: 'critical'
+};
+
 /**
- * Combines regex pattern findings and semantic model tags into high-confidence detections.
+ * Filters out failed validation matches and fuses OCR & Regex confidence ratings.
  * 
- * @param {Object[]} regexDetections - Detections from regexDetector
- * @param {Object[]} classifications - Classifications from miniLMClassifier
- * @returns {Object[]} Fused detection results
+ * @param {Object[]} detections - Validated candidate detections
+ * @returns {Object[]} Fused and filtered detections
  */
-export function fuseConfidences(regexDetections, classifications) {
-  if (!Array.isArray(regexDetections)) {
+export function fuseConfidences(detections) {
+  if (!Array.isArray(detections)) {
     return [];
   }
 
-  console.log('[ConfidenceFusion] Running weighted fusion on detections and classifications...');
+  return detections
+    .filter((det) => {
+      // 1. Drop false positives (e.g. failing Aadhaar/Luhn checks)
+      if (det.rulePassed === false) {
+        console.log(`[ConfidenceFusion] Dropping false positive: [${det.type}] "${det.value}" (failed checksum validation).`);
+        return false;
+      }
+      return true;
+    })
+    .map((det) => {
+      const ocrConf = typeof det.ocrConfidence === 'number' ? det.ocrConfidence : 0.5;
+      const regexConf = typeof det.regexConfidence === 'number' ? det.regexConfidence : 0.8;
 
-  // Boost confidence of regex detections if the document's classified category matches the PII type
-  return regexDetections.map((detection) => {
-    let boostedConfidence = detection.confidence;
+      // 2. Bayes-like weighted fusion (70% structural regex confidence, 30% OCR legibility confidence)
+      let fused = 0.7 * regexConf + 0.3 * ocrConf;
 
-    // Example boosting logic:
-    // If we matched a credit card pattern and the model classified the page as "Financial", boost/confirm confidence.
-    const hasFinancialContext = classifications.some((c) => c.topic === 'Financial Statement' && c.score > 0.8);
-    const hasPiiContext = classifications.some((c) => c.topic === 'Personal Identifiable Information' && c.score > 0.8);
+      // Clamp value between 0.0 and 1.0
+      fused = Math.min(1.0, Math.max(0.0, fused));
 
-    if (detection.type === 'CREDIT_CARD' && hasFinancialContext) {
-      boostedConfidence = Math.min(0.999, detection.confidence * 1.05);
-      console.log(`[ConfidenceFusion] Boosting CREDIT_CARD match based on Financial context: ${boostedConfidence}`);
-    } else if (detection.type === 'EMAIL' && hasPiiContext) {
-      boostedConfidence = Math.min(0.999, detection.confidence * 1.02);
-      console.log(`[ConfidenceFusion] Boosting EMAIL match based on PII context: ${boostedConfidence}`);
-    }
-
-    return {
-      ...detection,
-      confidence: boostedConfidence
-    };
-  });
+      return {
+        type: det.type,
+        value: det.value,
+        ocrConfidence: ocrConf,
+        regexConfidence: regexConf,
+        fusedConfidence: parseFloat(fused.toFixed(4)),
+        severity: SEVERITY_LEVELS[det.type] || 'medium',
+        startIndex: det.startIndex,
+        endIndex: det.endIndex,
+        bboxes: det.bboxes || [],
+        source: det.source || 'regex'
+      };
+    });
 }

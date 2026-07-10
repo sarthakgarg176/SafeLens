@@ -1,86 +1,133 @@
 /**
- * Detection Merger
+ * Bounding Box and Detection Merging Engine
  * 
  * Responsibility:
- * - Compares bounding boxes of text detections.
- * - Merges overlapping, overlapping-adjacent, or closely matching bounding boxes.
- * - Reduces redundant box counts to optimize redacting canvas drawing.
+ * - Consolidates overlapping and adjacent detection text records.
+ * - Resolves duplication when a single text range triggers multiple pattern categories.
+ * - Merges horizontally adjacent/overlapping bounding boxes belonging to the same PII block.
+ * - Ensures output detections are clean, isolated, and optimal for rendering.
  * 
  * Input/Output Contract:
- * - Input: Object[] (List of detections containing boxes)
- * - Output: Object[] (List of detections with consolidated/merged bounding boxes)
+ * - Input: Object[] (Validated PII detections)
+ * - Output: Object[] (Consolidated, unique detections with merged boxes)
  * 
  * Interacts with:
- * - extension/src/ai/blur/mergeBoundingBoxes.js (Delegates spatial box logic)
+ * - extension/src/ai/detection/confidenceFusion.js
  */
 
 /**
- * Merges close or overlapping detection regions.
+ * Merges adjacent bounding box coordinates located on the same horizontal line.
+ * Combines bounding blocks separated by less than 15 horizontal pixels into a single box.
  * 
- * @param {Object[]} detections - Raw detections list
- * @param {number} [paddingX=10] - Horizontal spacing tolerance to trigger a merge
- * @param {number} [paddingY=5] - Vertical spacing tolerance to trigger a merge
- * @returns {Object[]} Consolidated detections list
+ * @param {Object[]} boxes - Raw coordinates: { x, y, width, height, confidence }
+ * @returns {Object[]} Merged coordinates
  */
-export function mergeOverlappingDetections(detections, paddingX = 10, paddingY = 5) {
-  if (!Array.isArray(detections) || detections.length <= 1) {
-    return detections || [];
+export function mergeAdjacentBoxes(boxes) {
+  if (!Array.isArray(boxes) || boxes.length <= 1) {
+    return boxes;
   }
 
-  console.log(`[MergeDetections] Consolidating box layout of ${detections.length} detections...`);
-
-  // To simplify scaffolding, we group and return detections.
-  // In production, an interval-tree or bounding-box overlap algorithm merges them.
+  // Sort boxes left-to-right (by X coordinate)
+  const sorted = [...boxes].sort((a, b) => a.x - b.x);
   const merged = [];
-  const processed = new Set();
+  let current = sorted[0];
 
-  for (let i = 0; i < detections.length; i++) {
-    if (processed.has(i)) continue;
-    const current = detections[i];
-    processed.add(i);
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
 
-    // Deep-clone bboxes array to avoid mutability issues
-    const currentBoxes = current.bboxes ? [...current.bboxes] : [];
+    // Check vertical overlap alignment (same horizontal text line)
+    const currentYMax = current.y + current.height;
+    const nextYMax = next.y + next.height;
+    const verticalOverlap = Math.min(currentYMax, nextYMax) - Math.max(current.y, next.y);
 
-    for (let j = i + 1; j < detections.length; j++) {
-      if (processed.has(j)) continue;
-      const target = detections[j];
+    // Calculate horizontal spacing distance
+    const horizontalDistance = next.x - (current.x + current.width);
 
-      // If they are of the same type and overlap spatially, we merge their boxes
-      if (current.type === target.type && isOverlap(currentBoxes, target.bboxes, paddingX, paddingY)) {
-        console.log(`[MergeDetections] Merging adjacent detections of type: ${current.type}`);
-        currentBoxes.push(...(target.bboxes || []));
-        processed.add(j);
-      }
+    // Merge if aligned and horizontal space is under 15 pixels
+    if (verticalOverlap > 0 && horizontalDistance <= 15) {
+      const x0 = Math.min(current.x, next.x);
+      const y0 = Math.min(current.y, next.y);
+      const x1 = Math.max(current.x + current.width, next.x + next.width);
+      const y1 = Math.max(currentYMax, nextYMax);
+
+      current = {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+        confidence: Math.max(current.confidence, next.confidence)
+      };
+    } else {
+      merged.push(current);
+      current = next;
     }
-
-    merged.push({
-      ...current,
-      bboxes: currentBoxes
-    });
   }
 
-  console.log(`[MergeDetections] Consolidated layout into ${merged.length} detections.`);
+  merged.push(current);
   return merged;
 }
 
 /**
- * Helper to determine if two bounding box lists overlap within pixel tolerance.
+ * Consolidates overlapping text ranges and removes duplicative detections.
+ * If ranges overlap, selects the detection with higher structural rules verification status.
+ * 
+ * @param {Object[]} detections - Raw candidate detections
+ * @returns {Object[]} Merged unique detections list
  */
-function isOverlap(boxListA, boxListB, paddingX, paddingY) {
-  if (!boxListA || !boxListB) return false;
-  
-  for (const a of boxListA) {
-    for (const b of boxListB) {
-      // Check if coordinates overlap within padding limits
-      const isXOverlap = (a.x <= b.x + b.width + paddingX) && (b.x <= a.x + a.width + paddingX);
-      const isYOverlap = (a.y <= b.y + b.height + paddingY) && (b.y <= a.y + a.height + paddingY);
-      
-      if (isXOverlap && isYOverlap) {
-        return true;
+export function mergeOverlappingDetections(detections) {
+  if (!Array.isArray(detections) || detections.length <= 1) {
+    return detections || [];
+  }
+
+  // Sort by starting character string index
+  const sorted = [...detections].sort((a, b) => a.startIndex - b.startIndex);
+  const merged = [];
+  let current = sorted[0];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
+
+    // Overlap exists if next starts before current ends
+    if (next.startIndex <= current.endIndex) {
+      // Pick detection with rule validation passing status, or higher base confidence
+      const preferNext = (next.rulePassed && !current.rulePassed) || 
+                         (next.rulePassed === current.rulePassed && next.regexConfidence > current.regexConfidence);
+
+      if (preferNext) {
+        current = {
+          ...next,
+          startIndex: current.startIndex,
+          endIndex: Math.max(current.endIndex, next.endIndex),
+          value: current.value + next.value.substring(Math.max(0, current.endIndex - next.startIndex)),
+          bboxes: mergeAdjacentBoxes([...current.bboxes, ...next.bboxes])
+        };
+      } else {
+        current = {
+          ...current,
+          endIndex: Math.max(current.endIndex, next.endIndex),
+          value: current.value + next.value.substring(Math.max(0, current.endIndex - next.startIndex)),
+          bboxes: mergeAdjacentBoxes([...current.bboxes, ...next.bboxes])
+        };
       }
+    } else {
+      // No overlap. Push and move cursor
+      current.bboxes = mergeAdjacentBoxes(current.bboxes);
+      merged.push(current);
+      current = next;
     }
   }
-  
-  return false;
+
+  current.bboxes = mergeAdjacentBoxes(current.bboxes);
+  merged.push(current);
+
+  // Remove exact value duplicates if any remain
+  const seenValues = new Set();
+  return merged.filter((det) => {
+    const key = `${det.type}_${det.startIndex}_${det.value}`;
+    if (seenValues.has(key)) {
+      return false;
+    }
+    seenValues.add(key);
+    return true;
+  });
 }

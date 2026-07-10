@@ -89,17 +89,17 @@ export async function runScanPipeline(file, options = {}) {
     // 5. Scan text for structural patterns (Regex)
     const rawRegexDetections = scanText(ocrResult.text, wordBoxes);
 
-    // 6. Classify semantic context (MiniLM)
+    // 6. Run rule checks (Luhn checksums, Aadhaar Verhoeff) to filter false matches
+    const verifiedRegexDetections = validateDetections(rawRegexDetections);
+
+    // 7. Classify semantic context (MiniLM) (Mocked for now)
     const semanticClassifications = await classifyText(ocrResult.text);
 
-    // 7. Perform Bayes-like confidence fusion
-    const fusedDetections = fuseConfidences(rawRegexDetections, semanticClassifications);
-
-    // 8. Run rule checks (Luhn checksums, SSN valid ranges) to filter false matches
-    const verifiedDetections = validateDetections(fusedDetections);
+    // 8. Perform Bayes-like confidence fusion (filters out failed validation patterns)
+    const fusedDetections = fuseConfidences(verifiedRegexDetections, semanticClassifications);
 
     // 9. Consolidate overlapping/adjacent bounding regions
-    const mergedDetections = mergeOverlappingDetections(verifiedDetections);
+    const mergedDetections = mergeOverlappingDetections(fusedDetections);
 
     // 10. Grade overall document severity risk rating
     const riskReport = analyzeRisk(mergedDetections);

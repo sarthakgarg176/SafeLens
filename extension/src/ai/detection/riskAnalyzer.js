@@ -1,61 +1,78 @@
 /**
- * Risk Assessment Analyzer
+ * Document Risk Assessment Engine
  * 
  * Responsibility:
- * - Scores the severity of detected items based on PII category weights.
- * - Categorizes overall file risk into Low, Medium, or High categories.
- * - Computes a summary report mapping specific file items to risk types.
+ * - Grades the overall security threat level of a scanned document.
+ * - Computes a weighted score based on detection type severity, counts, and confidence levels.
+ * - Classifies final risk rating into: LOW, MEDIUM, HIGH, or CRITICAL.
+ * - Formats the final ScanResult summary report.
  * 
  * Input/Output Contract:
- * - Input: Object[] (List of fused and validated detections)
- * - Output: { riskLevel: 'low'|'medium'|'high', score: number, detections: Object[] }
+ * - Input: Object[] (Fused PII detections)
+ * - Output: { riskLevel: 'low'|'medium'|'high'|'critical', score: number, detections: Object[] }
  * 
  * Interacts with:
- * - extension/src/services/protectPipeline.js (Feeds the final decision evaluation)
+ * - extension/src/services/scanService.js (Feeds the final scan metadata)
  */
 
-// Weight constants for PII severity levels
-const SEVERITY_WEIGHTS = {
-  EMAIL: 1,
-  PHONE: 1,
-  IP_ADDRESS: 1,
-  SSN: 3,
-  CREDIT_CARD: 3
+const SEVERITY_POINTS = {
+  critical: 10,
+  high: 5,
+  medium: 2,
+  low: 1
 };
 
 /**
- * Rates the total risk and severity of the image document based on detections.
+ * Evaluates detections list and calculates the aggregate document risk score and level.
  * 
- * @param {Object[]} detections - List of validated, fused detections
- * @returns {{ riskLevel: 'low'|'medium'|'high', score: number, detections: Object[] }} Risk summary report
+ * @param {Object[]} detections - Clean list of fused PII detections
+ * @returns {{
+ *   riskLevel: 'low'|'medium'|'high'|'critical',
+ *   score: number,
+ *   detections: Object[]
+ * }} Document risk report
  */
 export function analyzeRisk(detections) {
   if (!Array.isArray(detections) || detections.length === 0) {
-    return { riskLevel: 'low', score: 0, detections: [] };
+    return {
+      riskLevel: 'low',
+      score: 0,
+      detections: []
+    };
   }
 
-  console.log(`[RiskAnalyzer] Scoring document risk for ${detections.length} detections...`);
-
-  // Calculate weighted sum
   let totalScore = 0;
+  let hasHighConfidenceCritical = false;
+
   detections.forEach((det) => {
-    const weight = SEVERITY_WEIGHTS[det.type] || 1;
-    totalScore += weight * det.confidence;
+    const points = SEVERITY_POINTS[det.severity] || 2;
+    const confidence = typeof det.fusedConfidence === 'number' ? det.fusedConfidence : 0.8;
+    
+    // Add weighted points to total score
+    totalScore += points * confidence;
+
+    // Direct elevation condition: any credentials/keys matched with high confidence
+    if (det.severity === 'critical' && confidence >= 0.70) {
+      hasHighConfidenceCritical = true;
+    }
   });
 
-  // Classify overall category
+  // Assign risk level based on cumulative score bounds and high-severity matches
   let riskLevel = 'low';
-  if (totalScore >= 3) {
+
+  if (hasHighConfidenceCritical || totalScore >= 15) {
+    riskLevel = 'critical';
+  } else if (totalScore >= 5) {
     riskLevel = 'high';
-  } else if (totalScore >= 1) {
+  } else if (totalScore >= 2) {
     riskLevel = 'medium';
   }
 
-  console.log(`[RiskAnalyzer] Evaluation score: ${totalScore.toFixed(2)}, Risk Level: ${riskLevel.toUpperCase()}`);
+  console.log(`[RiskAnalyzer] Calculated document risk score: ${totalScore.toFixed(2)} -> Level: ${riskLevel.toUpperCase()}`);
 
   return {
     riskLevel,
-    score: totalScore,
+    score: parseFloat(totalScore.toFixed(2)),
     detections
   };
 }

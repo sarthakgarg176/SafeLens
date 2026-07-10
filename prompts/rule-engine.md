@@ -4,7 +4,9 @@ You are a Software Quality and Validation Engineer. Create a rule verification e
 
 ## Requirements
 - Parse raw regex matches and apply mathematical checksum tests.
-- Implement the Luhn Algorithm (mod 10) to validate credit card numbers, filtering out random digit strings.
-- Validate Social Security Numbers (SSN) based on structural rules (e.g. check area code ranges, group indices cannot be 00).
-- Allow filtering out specific user-whitelisted domains or custom values.
-- Adjust confidence scores based on validation results.
+- Implement the Verhoeff Algorithm (multiplication/permutation/inverse matrices) to validate 12-digit Indian Aadhaar card numbers, filtering out start indices 0 and 1.
+- Implement the Luhn Algorithm (mod 10) to validate credit card numbers (lengths 13-19), filtering out random digit strings.
+- Validate Permanent Account Number (PAN) codes structure (regex matches 5 letters, 4 digits, 1 letter, and checks 4th-character holder codes).
+- Validate Passport, Driving License, and IFSC branch patterns strictly.
+- Output a boolean verification flag (`rulePassed`) to help upstream confidence filters drop false positives.
+
