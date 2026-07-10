@@ -24,6 +24,8 @@
  * @property {string} [error] - The error message on failure
  */
 import { preprocessImage } from '../ai/preprocessing/preprocessImage.js';
+import { protectImagePipeline } from '../services/protectService.js';
+import { bridgeClient } from '../communication/bridgeClient.js';
 
 /**
  * Registry of message handlers
@@ -67,6 +69,31 @@ const handlers = {
   },
 
   /**
+   * Runs the complete local privacy protection pipeline on the file's ArrayBuffer.
+   */
+  RUN_PROTECT_PIPELINE: async (payload) => {
+    if (!payload || !payload.arrayBuffer) {
+      throw new Error('Invalid payload: arrayBuffer is required');
+    }
+
+    // Ensure OpenCV.js is fully loaded and ready
+    await waitForOpenCV();
+
+    const { arrayBuffer, name, type, settings } = payload;
+
+    // Build background-safe File interface mock object
+    const mockFile = {
+      name: name || 'upload.png',
+      size: arrayBuffer.byteLength,
+      type: type || 'image/png',
+      arrayBuffer: () => Promise.resolve(arrayBuffer)
+    };
+
+    const result = await protectImagePipeline(mockFile, settings);
+    return result;
+  },
+
+  /**
    * Toggle or set extension settings in storage.
    */
   SET_SETTINGS: async (payload) => {
@@ -74,6 +101,14 @@ const handlers = {
       throw new Error('Invalid settings payload');
     }
     await chrome.storage.local.set({ settings: payload });
+    
+    // Sync settings change to the backend server profile
+    try {
+      await bridgeClient.syncSettings(payload);
+    } catch (e) {
+      console.warn('[MessageRouter] Settings sync failed:', e);
+    }
+    
     return { success: true };
   },
 
@@ -95,6 +130,29 @@ const handlers = {
     const { scans = [] } = await chrome.storage.local.get('scans');
     const updatedScans = [payload, ...scans].slice(0, 100); // Keep last 100 scans
     await chrome.storage.local.set({ scans: updatedScans });
+
+    // Sync metrics and dispatch alerts to bridge channels
+    try {
+      await bridgeClient.syncScanResult({
+        metadata: { name: payload.fileName, size: payload.size, type: 'image/png' },
+        ...payload
+      });
+
+      if (payload.riskLevel !== 'low') {
+        await bridgeClient.sendIncidentNotification({
+          incidentId: payload.scanId,
+          fileName: payload.fileName,
+          fileSize: payload.size,
+          riskLevel: payload.riskLevel,
+          status: payload.status,
+          detections: payload.detections,
+          timestamp: Date.now()
+        });
+      }
+    } catch (e) {
+      console.warn('[MessageRouter] Failed to sync scan metadata with BridgeClient:', e);
+    }
+
     return { success: true };
   }
 };

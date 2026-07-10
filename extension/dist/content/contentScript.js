@@ -1,157 +1,175 @@
-(function(){"use strict";const h=new Set(["image/png","image/jpeg","image/jpg","image/webp","image/gif"]);function y(e,t,n,o){if(!e||e.length===0)return;const a=Array.from(e),s=[],i=[];for(const r of a)h.has(r.type)?(s.push(r),i.push({name:r.name,size:r.size,type:r.type,lastModified:r.lastModified})):console.log(`[UploadDetector] Ignoring unsupported file type: ${r.type} (${r.name})`);s.length>0?(console.log(`[UploadDetector] Detected ${s.length} image(s) for scanning:`,i),o.interceptUpload(s,i,t,n)):(console.log("[UploadDetector] No image files detected. Proceeding with standard file upload."),n(e))}window.__SafeLensProtectPipeline=null;function x(e,t,n,o){console.log("[UploadInterceptor] Intercepted upload request",{fileCount:e.length,targetElement:n}),typeof window.__SafeLensProtectPipeline=="function"?window.__SafeLensProtectPipeline(e).then(({action:a,processedFiles:s})=>{p(a,s||e,o)}).catch(a=>{console.error("[UploadInterceptor] Custom protect pipeline failed:",a),f(e,t,o)}):f(e,t,o)}function p(e,t,n){switch(e){case"protect":console.log("[UploadInterceptor] User selected: PROTECT. Simulating AI pipeline..."),w(t).then(o=>{n(o)});break;case"anyway":console.log("[UploadInterceptor] User selected: UPLOAD ANYWAY. Re-triggering original files."),n(t);break;case"cancel":default:console.log("[UploadInterceptor] User selected: CANCEL. Upload terminated.");break}}async function w(e){return new Promise(t=>{setTimeout(()=>{const n=e.map(o=>new File([o],o.name.replace(/(\.[\w\d]+)$/,"_protected$1"),{type:o.type,lastModified:Date.now()}));console.log("[UploadInterceptor] Protection complete. Simulated redacted files:",n),t(n)},1200)})}function v(e){return e.replace(/[&<>"']/g,t=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[t])}function f(e,t,n){if(document.getElementById("safelens-intercept-modal"))return;const o=document.createElement("div");o.id="safelens-intercept-modal";const a=document.createElement("style");a.textContent=`
-    #safelens-intercept-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(10, 12, 16, 0.85);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      z-index: 2147483647;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
-      color: #c5c6c7;
-    }
-    .sl-modal-card {
-      width: 420px;
-      background: linear-gradient(135deg, #121824 0%, #0b0c10 100%);
-      border: 1px solid #2f3e46;
-      border-radius: 16px;
-      padding: 28px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      animation: sl-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    @keyframes sl-fade-in {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .sl-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      border-bottom: 1px solid #2f3e46;
-      padding-bottom: 16px;
-    }
-    .sl-pulse {
-      width: 10px;
-      height: 10px;
-      background-color: #66fcf1;
-      border-radius: 50%;
-      box-shadow: 0 0 10px #66fcf1;
-    }
-    .sl-title {
-      font-size: 20px;
-      font-weight: 800;
-      margin: 0;
-      background: linear-gradient(90deg, #66fcf1 0%, #4facfe 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .sl-badge {
-      background: rgba(102, 252, 241, 0.1);
-      border: 1px solid #66fcf1;
-      color: #66fcf1;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 99px;
-      margin-left: auto;
-    }
-    .sl-body {
-      font-size: 13px;
-      line-height: 1.5;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .sl-file-list {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid #2f3e46;
-      border-radius: 8px;
-      padding: 12px;
-      max-height: 100px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .sl-file-item {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      font-family: monospace;
-    }
-    .sl-file-size {
-      color: #718096;
-    }
-    .sl-footer {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 8px;
-    }
-    .sl-btn {
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: center;
-      border: 1px solid transparent;
-    }
-    .sl-btn-protect {
-      background: #66fcf1;
-      color: #0b0c10;
-    }
-    .sl-btn-protect:hover {
-      box-shadow: 0 0 15px rgba(102, 252, 241, 0.4);
-      background: #76fff5;
-    }
-    .sl-btn-anyway {
-      background: rgba(246, 173, 85, 0.1);
-      border: 1px solid #f6ad55;
-      color: #f6ad55;
-    }
-    .sl-btn-anyway:hover {
-      background: rgba(246, 173, 85, 0.2);
-    }
-    .sl-btn-cancel {
-      background: rgba(113, 128, 150, 0.1);
-      border: 1px solid #718096;
-      color: #cbd5e0;
-    }
-    .sl-btn-cancel:hover {
-      background: rgba(113, 128, 150, 0.2);
-    }
-  `;const s=t.map(r=>{const k=r.name.length>28?r.name.substring(0,25)+"...":r.name;return`
-      <div class="sl-file-item">
-        <span>📄 ${v(k)}</span>
-        <span class="sl-file-size">${(r.size/1024).toFixed(1)} KB</span>
-      </div>
-    `}).join("");o.innerHTML=`
-    <div class="sl-modal-card">
-      <div class="sl-header">
-        <div class="sl-pulse"></div>
-        <h2 class="sl-title">SafeLens Shield</h2>
-        <span class="sl-badge">Intercepted</span>
-      </div>
-      <div class="sl-body">
-        <p>SafeLens intercepted a file upload request. Choose how you want to proceed to secure your privacy:</p>
-        <div class="sl-file-list">
-          ${s}
+(function(){"use strict";const Oe=new Set(["image/png","image/jpeg","image/jpg","image/webp","image/gif"]);function De(e,t,r,n){if(!e||e.length===0)return;const o=Array.from(e),a=[],i=[];for(const c of o)Oe.has(c.type)?(a.push(c),i.push({name:c.name,size:c.size,type:c.type,lastModified:c.lastModified})):console.log(`[UploadDetector] Ignoring unsupported file type: ${c.type} (${c.name})`);a.length>0?(console.log(`[UploadDetector] Detected ${a.length} image(s) for scanning:`,i),n.interceptUpload(a,i,t,r)):(console.log("[UploadDetector] No image files detected. Proceeding with standard file upload."),r(e))}function Te(e){return e.replace(/[&<>"']/g,t=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[t])}function Pe(e,t){return new Promise(r=>{if(document.getElementById("safelens-intercept-modal"))return r("cancel");const n=document.createElement("div");n.id="safelens-intercept-modal";const o=document.createElement("style");o.textContent=`
+      #safelens-intercept-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(10, 12, 16, 0.88);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 2147483647;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+        color: #e2e8f0;
+      }
+      .sl-modal-card {
+        width: 440px;
+        background: linear-gradient(135deg, #131722 0%, #0c0e14 100%);
+        border: 1px solid rgba(102, 252, 241, 0.25);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(102, 252, 241, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        animation: sl-scale-up 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      @keyframes sl-scale-up {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .sl-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 18px;
+      }
+      .sl-pulse-glow {
+        width: 12px;
+        height: 12px;
+        background-color: #66fcf1;
+        border-radius: 50%;
+        box-shadow: 0 0 15px #66fcf1;
+        animation: sl-pulse-anim 2s infinite;
+      }
+      @keyframes sl-pulse-anim {
+        0% { transform: scale(0.9); opacity: 0.8; }
+        50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 25px #66fcf1; }
+        100% { transform: scale(0.9); opacity: 0.8; }
+      }
+      .sl-title {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 0;
+        background: linear-gradient(90deg, #66fcf1 0%, #00d2ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .sl-badge {
+        background: rgba(102, 252, 241, 0.12);
+        border: 1px solid rgba(102, 252, 241, 0.4);
+        color: #66fcf1;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 99px;
+        margin-left: auto;
+      }
+      .sl-body {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #a0aec0;
+      }
+      .sl-body p {
+        margin: 0 0 14px 0;
+      }
+      .sl-file-list {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 14px;
+        max-height: 120px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .sl-file-item {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-family: 'Space Mono', monospace;
+        color: #e2e8f0;
+      }
+      .sl-file-size {
+        color: #718096;
+      }
+      .sl-footer {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 6px;
+      }
+      .sl-btn {
+        padding: 13px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        text-align: center;
+        border: 1px solid transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .sl-btn-protect {
+        background: linear-gradient(90deg, #66fcf1 0%, #00b4db 100%);
+        color: #0b0c10;
+        box-shadow: 0 4px 15px rgba(102, 252, 241, 0.2);
+      }
+      .sl-btn-protect:hover {
+        background: linear-gradient(90deg, #76fff5 0%, #00c6f0 100%);
+        box-shadow: 0 6px 20px rgba(102, 252, 241, 0.35);
+        transform: translateY(-1px);
+      }
+      .sl-btn-anyway {
+        background: rgba(246, 173, 85, 0.06);
+        border: 1px solid rgba(246, 173, 85, 0.4);
+        color: #f6ad55;
+      }
+      .sl-btn-anyway:hover {
+        background: rgba(246, 173, 85, 0.15);
+        border-color: #f6ad55;
+        transform: translateY(-1px);
+      }
+      .sl-btn-cancel {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #a0aec0;
+      }
+      .sl-btn-cancel:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        transform: translateY(-1px);
+      }
+    `;const a=t.map(s=>{const f=s.name.length>30?s.name.substring(0,27)+"...":s.name;return`
+        <div class="sl-file-item">
+          <span>📄 ${Te(f)}</span>
+          <span class="sl-file-size">${(s.size/1024).toFixed(1)} KB</span>
+        </div>
+      `}).join("");n.innerHTML=`
+      <div class="sl-modal-card">
+        <div class="sl-header">
+          <div class="sl-pulse-glow"></div>
+          <h2 class="sl-title">SafeLens Shield</h2>
+          <span class="sl-badge">Intercepted</span>
+        </div>
+        <div class="sl-body">
+          <p>An outbound image upload was intercepted. Select your privacy protection level to proceed:</p>
+          <div class="sl-file-list">
+            ${a}
+          </div>
+        </div>
+        <div class="sl-footer">
+          <div id="sl-btn-protect" class="sl-btn sl-btn-protect">🛡️ Protect & Upload (Secure)</div>
+          <div id="sl-btn-anyway" class="sl-btn sl-btn-anyway">⚠️ Upload Anyway (Unsecured)</div>
+          <div id="sl-btn-cancel" class="sl-btn sl-btn-cancel">❌ Cancel Upload</div>
         </div>
       </div>
-      <div class="sl-footer">
-        <div id="sl-btn-protect" class="sl-btn sl-btn-protect">🛡️ Protect (Redact & Upload)</div>
-        <div id="sl-btn-anyway" class="sl-btn sl-btn-anyway">⚠️ Upload Anyway (Unprotected)</div>
-        <div id="sl-btn-cancel" class="sl-btn sl-btn-cancel">❌ Cancel Upload</div>
-      </div>
-    </div>
-  `,o.appendChild(a),document.body.appendChild(o),document.getElementById("sl-btn-protect").addEventListener("click",()=>{i(),p("protect",e,n)}),document.getElementById("sl-btn-anyway").addEventListener("click",()=>{i(),p("anyway",e,n)}),document.getElementById("sl-btn-cancel").addEventListener("click",()=>{i(),p("cancel",e,n)});function i(){o.parentNode&&o.parentNode.removeChild(o)}}const E=Object.freeze(Object.defineProperty({__proto__:null,interceptUpload:x},Symbol.toStringTag,{value:"Module"}));let u=null;const c=new Map;function g(e){return e.isSafeLensTriggered===!0||e.detail&&e.detail.isSafeLensTriggered===!0}function d(e){return function(t){if(g(t))return;let n=null;const o=t.currentTarget||t.target;if(e==="change"&&t.target.files?n=t.target.files:e==="drop"&&t.dataTransfer?n=t.dataTransfer.files:e==="paste"&&t.clipboardData&&(n=t.clipboardData.files),!n||n.length===0)return;t.preventDefault(),t.stopImmediatePropagation(),y(n,o,s=>{console.log(`[DOMObserver] Re-injecting and triggering event: ${e}`,{fileCount:s.length});const i=new DataTransfer;if(Array.from(s).forEach(r=>i.items.add(r)),e==="change"){o.files=i.files;const r=new Event("change",{bubbles:!0,cancelable:!0});r.isSafeLensTriggered=!0,o.dispatchEvent(r)}else if(e==="drop"){const r=new DragEvent("drop",{bubbles:!0,cancelable:!0,dataTransfer:i});r.isSafeLensTriggered=!0,o.dispatchEvent(r)}else if(e==="paste"){const r=new ClipboardEvent("paste",{bubbles:!0,cancelable:!0,clipboardData:i});r.isSafeLensTriggered=!0,o.dispatchEvent(r)}},E)}}function b(e){g(e)||e.preventDefault()}function l(e,t,n){if(c.size>200)for(const a of c.keys())a.isConnected||c.delete(a);c.has(e)||c.set(e,{});const o=c.get(e);o[t]||(e.addEventListener(t,n,!0),o[t]=n)}function m(e){if(!e||typeof e.querySelectorAll!="function")return;e.querySelectorAll('input[type="file"]').forEach(a=>{l(a,"change",d("change"))}),e.querySelectorAll('[class*="drop"], [class*="upload"], [id*="drop"], [id*="upload"], [role="button"]').forEach(a=>{l(a,"dragover",b),l(a,"drop",d("drop"))}),e.querySelectorAll('textarea, [contenteditable="true"]').forEach(a=>{l(a,"paste",d("paste"))})}function S(){console.log("[DOMObserver] Initializing DOM Observer..."),m(document),document.body&&(u=new MutationObserver(e=>{for(const t of e)t.type==="childList"&&t.addedNodes.forEach(n=>{n.nodeType===Node.ELEMENT_NODE&&m(n)})}),u.observe(document.body,{childList:!0,subtree:!0})),l(document,"change",d("change")),l(document,"dragover",b),l(document,"drop",d("drop")),l(document,"paste",d("paste"))}console.log("[SafeLens] Content Script successfully injected.");try{S()}catch(e){console.error("[SafeLens] Failed to initialize content observers:",e)}})();
+    `,n.appendChild(o),document.body.appendChild(n);const i=document.getElementById("sl-btn-protect"),c=document.getElementById("sl-btn-anyway"),u=document.getElementById("sl-btn-cancel"),h=s=>{p(),r(s)};i.addEventListener("click",()=>h("protect")),c.addEventListener("click",()=>h("anyway")),u.addEventListener("click",()=>h("cancel"));function p(){n.parentNode&&n.parentNode.removeChild(n)}})}async function Re(e,t=1920,r=1080){if(!e)throw new TypeError("Canvas parameter is required");let n=null,o=null;try{let{width:a,height:i}=e,c=!1;if(a>t&&(i=Math.round(i*t/a),a=t,c=!0),i>r&&(a=Math.round(a*r/i),i=r,c=!0),!c)return e;if(console.log(`[Resize] Scaling image down to ${a}x${i} using cv.resize`),typeof cv>"u"||!cv.matFromImageData)throw new Error("OpenCV.js runtime is not loaded");const h=e.getContext("2d").getImageData(0,0,e.width,e.height);n=cv.matFromImageData(h),o=new cv.Mat;const p=new cv.Size(a,i);cv.resize(n,o,p,0,0,cv.INTER_AREA);const s=typeof OffscreenCanvas<"u"?new OffscreenCanvas(a,i):document.createElement("canvas");s.width=a,s.height=i;const f=s.getContext("2d"),m=new ImageData(new Uint8ClampedArray(o.data),o.cols,o.rows);return f.putImageData(m,0,0),s}catch(a){console.warn("[Resize] OpenCV resizing failed. Falling back to native canvas context scaling:",a);try{const{width:i,height:c}=e;let u=i,h=c;u>t&&(h=Math.round(h*t/u),u=t),h>r&&(u=Math.round(u*r/h),h=r);const p=typeof OffscreenCanvas<"u"?new OffscreenCanvas(u,h):document.createElement("canvas");p.width=u,p.height=h;const s=p.getContext("2d");return s.imageSmoothingEnabled=!0,s.imageSmoothingQuality="high",s.drawImage(e,0,0,u,h),p}catch(i){return console.error("[Resize] Native canvas resizing fallback failed. Returning original image.",i),e}}finally{n&&n.delete(),o&&o.delete()}}async function Le(e){if(!e)throw new TypeError("Canvas parameter is required");let t=null,r=null,n=null;try{if(typeof cv>"u"||!cv.cvtColor)throw new Error("OpenCV.js runtime is not loaded");const a=e.getContext("2d").getImageData(0,0,e.width,e.height);t=cv.matFromImageData(a),r=new cv.Mat,cv.cvtColor(t,r,cv.COLOR_RGBA2GRAY),n=new cv.Mat,cv.cvtColor(r,n,cv.COLOR_GRAY2RGBA);const i=typeof OffscreenCanvas<"u"?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");i.width=e.width,i.height=e.height;const c=i.getContext("2d"),u=new ImageData(new Uint8ClampedArray(n.data),n.cols,n.rows);return c.putImageData(u,0,0),i}catch(o){console.warn("[Grayscale] OpenCV conversion failed. Falling back to native JS luminosity conversions:",o);try{const i=e.getContext("2d").getImageData(0,0,e.width,e.height),c=i.data;for(let h=0;h<c.length;h+=4){const p=c[h],s=c[h+1],f=c[h+2],m=Math.round(.299*p+.587*s+.114*f);c[h]=m,c[h+1]=m,c[h+2]=m}const u=typeof OffscreenCanvas<"u"?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");return u.width=e.width,u.height=e.height,u.getContext("2d").putImageData(i,0,0),u}catch(a){return console.error("[Grayscale] JS grayscale fallback failed. Returning original image.",a),e}}finally{t&&t.delete(),r&&r.delete(),n&&n.delete()}}async function $e(e){if(!e)throw new TypeError("Canvas parameter is required");let t=null,r=null;try{if(typeof cv>"u"||!cv.GaussianBlur)throw new Error("OpenCV.js runtime is not loaded");const o=e.getContext("2d").getImageData(0,0,e.width,e.height);t=cv.matFromImageData(o),r=new cv.Mat;const a=new cv.Size(3,3);cv.GaussianBlur(t,r,a,0,0,cv.BORDER_DEFAULT);const i=typeof OffscreenCanvas<"u"?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");i.width=e.width,i.height=e.height;const c=i.getContext("2d"),u=new ImageData(new Uint8ClampedArray(r.data),r.cols,r.rows);return c.putImageData(u,0,0),i}catch(n){return console.warn("[Denoise] Denoising failed. Skipping this stage and returning original canvas:",n),e}finally{t&&t.delete(),r&&r.delete()}}async function _e(e){if(!e)throw new TypeError("Canvas parameter is required");let t=null,r=null,n=null,o=null,a=null,i=null;try{if(typeof cv>"u"||!cv.HoughLinesP)throw new Error("OpenCV.js runtime is not loaded");const u=e.getContext("2d").getImageData(0,0,e.width,e.height);t=cv.matFromImageData(u),r=new cv.Mat,n=new cv.Mat,o=new cv.Mat,cv.cvtColor(t,r,cv.COLOR_RGBA2GRAY),cv.Canny(r,n,50,200,3),cv.HoughLinesP(n,o,1,Math.PI/180,100,50,10);let h=0,p=0;for(let v=0;v<o.rows;++v){const b=o.data32S[v*4],S=o.data32S[v*4+1],O=o.data32S[v*4+2],D=o.data32S[v*4+3],P=Math.atan2(D-S,O-b)*(180/Math.PI);P>-45&&P<45&&(h+=P,p++)}if(p<3)return console.log("[Deskew] Insufficient line segments detected. Skipping deskew."),{canvas:e,angle:0};const s=h/p;if(Math.abs(s)<.5)return console.log(`[Deskew] Skew angle is negligible (${s.toFixed(2)} deg). Skipping rotation.`),{canvas:e,angle:0};console.log(`[Deskew] Correcting skew angle: ${s.toFixed(2)} degrees`);const f=new cv.Point(e.width/2,e.height/2);i=cv.getRotationMatrix2D(f,s,1),a=new cv.Mat;const m=new cv.Size(e.width,e.height);cv.warpAffine(t,a,i,m,cv.INTER_CUBIC,cv.BORDER_REPLICATE);const I=typeof OffscreenCanvas<"u"?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");I.width=e.width,I.height=e.height;const M=I.getContext("2d"),A=new ImageData(new Uint8ClampedArray(a.data),a.cols,a.rows);return M.putImageData(A,0,0),{canvas:I,angle:s}}catch(c){return console.warn("[Deskew] Hough deskewing failed. Skipping this stage and returning original canvas:",c),{canvas:e,angle:0}}finally{t&&t.delete(),r&&r.delete(),n&&n.delete(),o&&o.delete(),a&&a.delete(),i&&i.delete()}}async function Ne(e,t=127){if(!e)throw new TypeError("Canvas parameter is required");let r=null,n=null,o=null,a=null;try{if(typeof cv>"u"||!cv.adaptiveThreshold)throw new Error("OpenCV.js runtime is not loaded");const c=e.getContext("2d").getImageData(0,0,e.width,e.height);r=cv.matFromImageData(c),n=new cv.Mat,cv.cvtColor(r,n,cv.COLOR_RGBA2GRAY),o=new cv.Mat,cv.adaptiveThreshold(n,o,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY,11,2),a=new cv.Mat,cv.cvtColor(o,a,cv.COLOR_GRAY2RGBA);const u=typeof OffscreenCanvas<"u"?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");u.width=e.width,u.height=e.height;const h=u.getContext("2d"),p=new ImageData(new Uint8ClampedArray(a.data),a.cols,a.rows);return h.putImageData(p,0,0),u}catch(i){console.warn("[Threshold] OpenCV adaptive thresholding failed. Falling back to grayscale image:",i);try{return await ze(e)}catch(c){return console.error("[Threshold] Grayscale fallback failed. Returning original canvas.",c),e}}finally{r&&r.delete(),n&&n.delete(),o&&o.delete(),a&&a.delete()}}async function ze(e){const r=e.getContext("2d").getImageData(0,0,e.width,e.height),n=r.data;for(let a=0;a<n.length;a+=4){const i=Math.round(.299*n[a]+.587*n[a+1]+.114*n[a+2]);n[a]=i,n[a+1]=i,n[a+2]=i}const o=typeof OffscreenCanvas<"u"?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");return o.width=e.width,o.height=e.height,o.getContext("2d").putImageData(r,0,0),o}async function Fe(e,t={}){const{enableDenoise:r=!0,enableDeskew:n=!0,thresholdValue:o=127,maxWidth:a=1920,maxHeight:i=1080}=t;console.log("[Preprocessor] Beginning OpenCV.js image preprocessing pipeline...");const c=Date.now();let u=e;try{try{u=await Re(u,a,i)}catch(s){console.warn("[Preprocessor] Resize stage failed. Continuing...",s)}try{u=await Le(u)}catch(s){console.warn("[Preprocessor] Grayscale stage failed. Continuing...",s)}if(r)try{u=await $e(u)}catch(s){console.warn("[Preprocessor] Denoise stage failed. Continuing...",s)}let h=0;if(n)try{const s=await _e(u);u=s.canvas,h=s.angle}catch(s){console.warn("[Preprocessor] Deskew stage failed. Continuing...",s)}try{u=await Ne(u,o)}catch(s){console.warn("[Preprocessor] Threshold binarization stage failed. Continuing...",s)}const p=Date.now()-c;return console.log(`[Preprocessor] Pipeline resolved successfully in ${p}ms. Skew Angle: ${h.toFixed(2)} deg.`),u}catch(h){return console.error("[Preprocessor] Critical pipeline failure. Returning original image.",h),e}}var Be={exports:{}};(function(e){var t=function(r){var n=Object.prototype,o=n.hasOwnProperty,a=Object.defineProperty||function(d,l,g){d[l]=g.value},i,c=typeof Symbol=="function"?Symbol:{},u=c.iterator||"@@iterator",h=c.asyncIterator||"@@asyncIterator",p=c.toStringTag||"@@toStringTag";function s(d,l,g){return Object.defineProperty(d,l,{value:g,enumerable:!0,configurable:!0,writable:!0}),d[l]}try{s({},"")}catch{s=function(l,g,w){return l[g]=w}}function f(d,l,g,w){var y=l&&l.prototype instanceof S?l:S,E=Object.create(y.prototype),N=new Q(w||[]);return a(E,"_invoke",{value:le(d,g,N)}),E}r.wrap=f;function m(d,l,g){try{return{type:"normal",arg:d.call(l,g)}}catch(w){return{type:"throw",arg:w}}}var I="suspendedStart",M="suspendedYield",A="executing",v="completed",b={};function S(){}function O(){}function D(){}var P={};s(P,u,function(){return this});var z=Object.getPrototypeOf,R=z&&z(z(x([])));R&&R!==n&&o.call(R,u)&&(P=R);var T=D.prototype=S.prototype=Object.create(P);O.prototype=D,a(T,"constructor",{value:D,configurable:!0}),a(D,"constructor",{value:O,configurable:!0}),O.displayName=s(D,p,"GeneratorFunction");function _(d){["next","throw","return"].forEach(function(l){s(d,l,function(g){return this._invoke(l,g)})})}r.isGeneratorFunction=function(d){var l=typeof d=="function"&&d.constructor;return l?l===O||(l.displayName||l.name)==="GeneratorFunction":!1},r.mark=function(d){return Object.setPrototypeOf?Object.setPrototypeOf(d,D):(d.__proto__=D,s(d,p,"GeneratorFunction")),d.prototype=Object.create(T),d},r.awrap=function(d){return{__await:d}};function J(d,l){function g(E,N,F,U){var B=m(d[E],d,N);if(B.type==="throw")U(B.arg);else{var ue=B.arg,ee=ue.value;return ee&&typeof ee=="object"&&o.call(ee,"__await")?l.resolve(ee.__await).then(function(H){g("next",H,F,U)},function(H){g("throw",H,F,U)}):l.resolve(ee).then(function(H){ue.value=H,F(ue)},function(H){return g("throw",H,F,U)})}}var w;function y(E,N){function F(){return new l(function(U,B){g(E,N,U,B)})}return w=w?w.then(F,F):F()}a(this,"_invoke",{value:y})}_(J.prototype),s(J.prototype,h,function(){return this}),r.AsyncIterator=J,r.async=function(d,l,g,w,y){y===void 0&&(y=Promise);var E=new J(f(d,l,g,w),y);return r.isGeneratorFunction(l)?E:E.next().then(function(N){return N.done?N.value:E.next()})};function le(d,l,g){var w=I;return function(E,N){if(w===A)throw new Error("Generator is already running");if(w===v){if(E==="throw")throw N;return C()}for(g.method=E,g.arg=N;;){var F=g.delegate;if(F){var U=oe(F,g);if(U){if(U===b)continue;return U}}if(g.method==="next")g.sent=g._sent=g.arg;else if(g.method==="throw"){if(w===I)throw w=v,g.arg;g.dispatchException(g.arg)}else g.method==="return"&&g.abrupt("return",g.arg);w=A;var B=m(d,l,g);if(B.type==="normal"){if(w=g.done?v:M,B.arg===b)continue;return{value:B.arg,done:g.done}}else B.type==="throw"&&(w=v,g.method="throw",g.arg=B.arg)}}}function oe(d,l){var g=l.method,w=d.iterator[g];if(w===i)return l.delegate=null,g==="throw"&&d.iterator.return&&(l.method="return",l.arg=i,oe(d,l),l.method==="throw")||g!=="return"&&(l.method="throw",l.arg=new TypeError("The iterator does not provide a '"+g+"' method")),b;var y=m(w,d.iterator,l.arg);if(y.type==="throw")return l.method="throw",l.arg=y.arg,l.delegate=null,b;var E=y.arg;if(!E)return l.method="throw",l.arg=new TypeError("iterator result is not an object"),l.delegate=null,b;if(E.done)l[d.resultName]=E.value,l.next=d.nextLoc,l.method!=="return"&&(l.method="next",l.arg=i);else return E;return l.delegate=null,b}_(T),s(T,p,"Generator"),s(T,u,function(){return this}),s(T,"toString",function(){return"[object Generator]"});function de(d){var l={tryLoc:d[0]};1 in d&&(l.catchLoc=d[1]),2 in d&&(l.finallyLoc=d[2],l.afterLoc=d[3]),this.tryEntries.push(l)}function X(d){var l=d.completion||{};l.type="normal",delete l.arg,d.completion=l}function Q(d){this.tryEntries=[{tryLoc:"root"}],d.forEach(de,this),this.reset(!0)}r.keys=function(d){var l=Object(d),g=[];for(var w in l)g.push(w);return g.reverse(),function y(){for(;g.length;){var E=g.pop();if(E in l)return y.value=E,y.done=!1,y}return y.done=!0,y}};function x(d){if(d){var l=d[u];if(l)return l.call(d);if(typeof d.next=="function")return d;if(!isNaN(d.length)){var g=-1,w=function y(){for(;++g<d.length;)if(o.call(d,g))return y.value=d[g],y.done=!1,y;return y.value=i,y.done=!0,y};return w.next=w}}return{next:C}}r.values=x;function C(){return{value:i,done:!0}}return Q.prototype={constructor:Q,reset:function(d){if(this.prev=0,this.next=0,this.sent=this._sent=i,this.done=!1,this.delegate=null,this.method="next",this.arg=i,this.tryEntries.forEach(X),!d)for(var l in this)l.charAt(0)==="t"&&o.call(this,l)&&!isNaN(+l.slice(1))&&(this[l]=i)},stop:function(){this.done=!0;var d=this.tryEntries[0],l=d.completion;if(l.type==="throw")throw l.arg;return this.rval},dispatchException:function(d){if(this.done)throw d;var l=this;function g(U,B){return E.type="throw",E.arg=d,l.next=U,B&&(l.method="next",l.arg=i),!!B}for(var w=this.tryEntries.length-1;w>=0;--w){var y=this.tryEntries[w],E=y.completion;if(y.tryLoc==="root")return g("end");if(y.tryLoc<=this.prev){var N=o.call(y,"catchLoc"),F=o.call(y,"finallyLoc");if(N&&F){if(this.prev<y.catchLoc)return g(y.catchLoc,!0);if(this.prev<y.finallyLoc)return g(y.finallyLoc)}else if(N){if(this.prev<y.catchLoc)return g(y.catchLoc,!0)}else if(F){if(this.prev<y.finallyLoc)return g(y.finallyLoc)}else throw new Error("try statement without catch or finally")}}},abrupt:function(d,l){for(var g=this.tryEntries.length-1;g>=0;--g){var w=this.tryEntries[g];if(w.tryLoc<=this.prev&&o.call(w,"finallyLoc")&&this.prev<w.finallyLoc){var y=w;break}}y&&(d==="break"||d==="continue")&&y.tryLoc<=l&&l<=y.finallyLoc&&(y=null);var E=y?y.completion:{};return E.type=d,E.arg=l,y?(this.method="next",this.next=y.finallyLoc,b):this.complete(E)},complete:function(d,l){if(d.type==="throw")throw d.arg;return d.type==="break"||d.type==="continue"?this.next=d.arg:d.type==="return"?(this.rval=this.arg=d.arg,this.method="return",this.next="end"):d.type==="normal"&&l&&(this.next=l),b},finish:function(d){for(var l=this.tryEntries.length-1;l>=0;--l){var g=this.tryEntries[l];if(g.finallyLoc===d)return this.complete(g.completion,g.afterLoc),X(g),b}},catch:function(d){for(var l=this.tryEntries.length-1;l>=0;--l){var g=this.tryEntries[l];if(g.tryLoc===d){var w=g.completion;if(w.type==="throw"){var y=w.arg;X(g)}return y}}throw new Error("illegal catch attempt")},delegateYield:function(d,l,g){return this.delegate={iterator:x(d),resultName:l,nextLoc:g},this.method==="next"&&(this.arg=i),b}},r}(e.exports);try{regeneratorRuntime=t}catch{typeof globalThis=="object"?globalThis.regeneratorRuntime=t:Function("r","regeneratorRuntime = r")(t)}})(Be);var fe=(e,t)=>`${e}-${t}-${Math.random().toString(16).slice(3,8)}`;const Ue=fe;let ge=0;var Ge=({id:e,action:t,payload:r={}})=>{let n=e;return typeof n>"u"&&(n=Ue("Job",ge),ge+=1),{id:n,action:t,payload:r}},te={};let ae=!1;te.logging=ae,te.setLogging=e=>{ae=e},te.log=(...e)=>ae?console.log.apply(void 0,e):null;function We(e){throw new Error('Could not dynamically require "'+e+'". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.')}var qe=e=>{const t={};return typeof WorkerGlobalScope<"u"?t.type="webworker":typeof document=="object"?t.type="browser":typeof process=="object"&&typeof We=="function"&&(t.type="node"),typeof e>"u"?t:t[e]};const Ye=qe("type")==="browser"?e=>new URL(e,window.location.href).href:e=>e;var je=e=>{const t={...e};return["corePath","workerPath","langPath"].forEach(r=>{e[r]&&(t[r]=Ye(t[r]))}),t},He={TESSERACT_ONLY:0,LSTM_ONLY:1,TESSERACT_LSTM_COMBINED:2,DEFAULT:3};const Ze={version:"7.0.0"};var Ve={workerBlobURL:!0,logger:()=>{}};const Je=Ze.version;var Ke={...Ve,workerPath:`https://cdn.jsdelivr.net/npm/tesseract.js@v${Je}/dist/worker.min.js`},Xe=({workerPath:e,workerBlobURL:t})=>{let r;if(Blob&&URL&&t){const n=new Blob([`importScripts("${e}");`],{type:"application/javascript"});r=new Worker(URL.createObjectURL(n))}else r=new Worker(e);return r},Qe=e=>{e.terminate()},et=(e,t)=>{e.onmessage=({data:r})=>{t(r)}},tt=async(e,t)=>{e.postMessage(t)};const ie=e=>new Promise((t,r)=>{const n=new FileReader;n.onload=()=>{t(n.result)},n.onerror=({target:{error:{code:o}}})=>{r(Error(`File could not be read! Code=${o}`))},n.readAsArrayBuffer(e)}),se=async e=>{let t=e;if(typeof e>"u")return"undefined";if(typeof e=="string")/data:image\/([a-zA-Z]*);base64,([^"]*)/.test(e)?t=atob(e.split(",")[1]).split("").map(r=>r.charCodeAt(0)):t=await(await fetch(e)).arrayBuffer();else if(typeof HTMLElement<"u"&&e instanceof HTMLElement)e.tagName==="IMG"&&(t=await se(e.src)),e.tagName==="VIDEO"&&(t=await se(e.poster)),e.tagName==="CANVAS"&&await new Promise(r=>{e.toBlob(async n=>{t=await ie(n),r()})});else if(typeof OffscreenCanvas<"u"&&e instanceof OffscreenCanvas){const r=await e.convertToBlob();t=await ie(r)}else(e instanceof File||e instanceof Blob)&&(t=await ie(e));return new Uint8Array(t)};var nt=se,rt={defaultOptions:Ke,spawnWorker:Xe,terminateWorker:Qe,onMessage:et,send:tt,loadImage:nt};const ot=je,G=Ge,{log:he}=te,at=fe,j=He,{defaultOptions:it,spawnWorker:st,terminateWorker:ct,onMessage:lt,loadImage:pe,send:dt}=rt;let me=0;var ye=async(e="eng",t=j.LSTM_ONLY,r={},n={})=>{const o=at("Worker",me),{logger:a,errorHandler:i,...c}=ot({...it,...r}),u={},h=typeof e=="string"?e.split("+"):e;let p=t,s=n;const f=[j.DEFAULT,j.LSTM_ONLY].includes(t)&&!c.legacyCore;let m,I;const M=new Promise((x,C)=>{I=x,m=C}),A=x=>{m(x.message)};let v=st(c);v.onerror=A,me+=1;const b=({id:x,action:C,payload:d})=>new Promise((l,g)=>{he(`[${o}]: Start ${x}, action=${C}`);const w=`${C}-${x}`;u[w]={resolve:l,reject:g},dt(v,{workerId:o,jobId:x,action:C,payload:d})}),S=()=>console.warn("`load` is depreciated and should be removed from code (workers now come pre-loaded)"),O=x=>b(G({id:x,action:"load",payload:{options:{lstmOnly:f,corePath:c.corePath,logging:c.logging}}})),D=(x,C,d)=>b(G({id:d,action:"FS",payload:{method:"writeFile",args:[x,C]}})),P=(x,C)=>b(G({id:C,action:"FS",payload:{method:"readFile",args:[x,{encoding:"utf8"}]}})),z=(x,C)=>b(G({id:C,action:"FS",payload:{method:"unlink",args:[x]}})),R=(x,C,d)=>b(G({id:d,action:"FS",payload:{method:x,args:C}})),T=(x,C)=>b(G({id:C,action:"loadLanguage",payload:{langs:x,options:{langPath:c.langPath,dataPath:c.dataPath,cachePath:c.cachePath,cacheMethod:c.cacheMethod,gzip:c.gzip,lstmOnly:[j.DEFAULT,j.LSTM_ONLY].includes(p)&&!c.legacyLang}}})),_=(x,C,d,l)=>b(G({id:l,action:"initialize",payload:{langs:x,oem:C,config:d}})),J=(x="eng",C,d,l)=>{if(f&&[j.TESSERACT_ONLY,j.TESSERACT_LSTM_COMBINED].includes(C))throw Error("Legacy model requested but code missing.");const g=C||p;p=g;const w=d||s;s=w;const E=(typeof x=="string"?x.split("+"):x).filter(N=>!h.includes(N));return h.push(...E),E.length>0?T(E,l).then(()=>_(x,g,w,l)):_(x,g,w,l)},le=(x={},C)=>b(G({id:C,action:"setParameters",payload:{params:x}})),oe=async(x,C={},d={text:!0},l)=>b(G({id:l,action:"recognize",payload:{image:await pe(x),options:C,output:d}})),de=async(x,C)=>{if(f)throw Error("`worker.detect` requires Legacy model, which was not loaded.");return b(G({id:C,action:"detect",payload:{image:await pe(x)}}))},X=async()=>(v!==null&&(ct(v),v=null),Promise.resolve());lt(v,({workerId:x,jobId:C,status:d,action:l,data:g})=>{const w=`${l}-${C}`;if(d==="resolve")he(`[${x}]: Complete ${C}`),u[w].resolve({jobId:C,data:g}),delete u[w];else if(d==="reject")if(u[w].reject(g),delete u[w],l==="load"&&m(g),i)i(g);else throw Error(g);else d==="progress"&&a({...g,userJobId:C})});const Q={id:o,worker:v,load:S,writeText:D,readText:P,removeFile:z,FS:R,reinitialize:J,setParameters:le,recognize:oe,detect:de,terminate:X};return O().then(()=>T(e)).then(()=>_(e,t,n)).then(()=>I(Q)).catch(()=>{}),M};const we=ye;var ut={recognize:async(e,t,r)=>{const n=await we(t,1,r);return n.recognize(e).finally(async()=>{await n.terminate()})},detect:async(e,t)=>{const r=await we("osd",0,t);return r.detect(e).finally(async()=>{await r.terminate()})}},ft={createWorker:ye,...ut};let ce=null,K=null,be=Promise.resolve();async function gt(e="eng"){return ce||K||(K=(async()=>{try{console.log(`[TesseractWorker] Spawning local OCR worker for language: ${e}...`);const t=chrome.runtime.getURL("tesseract/worker.min.js"),r=chrome.runtime.getURL("tesseract/tesseract-core.wasm.js"),n=chrome.runtime.getURL("tesseract/");console.log("[TesseractWorker] Configuring local sandboxed paths:",{workerPath:t,corePath:r,langPath:n});const o=await ft.createWorker(e,1,{workerPath:t,corePath:r,langPath:n,cacheMethod:"none",gzip:!0,logger:a=>{a.status==="recognizing text"&&console.log(`[TesseractWorker] OCR Progress: ${Math.round(a.progress*100)}%`)}});return ce=o,o}catch(t){throw console.error("[TesseractWorker] Failed to create or load worker:",t),K=null,t}})(),K)}async function ht(e){let t;const r=new Promise(n=>{be.then(()=>n())});be=new Promise(n=>{t=n}),await r;try{const n=await gt(),a=e.getContext("2d").getImageData(0,0,e.width,e.height);return await n.recognize(a)}finally{t()}}function pt(e){return!e||!Array.isArray(e.words)?[]:(console.log(`[ExtractWords] Extracting word structures. Found count: ${e.words.length}`),e.words.map(t=>({text:t.text||"",confidence:typeof t.confidence=="number"?t.confidence:0,bbox:{x0:t.bbox?t.bbox.x0:0,y0:t.bbox?t.bbox.y0:0,x1:t.bbox?t.bbox.x1:0,y1:t.bbox?t.bbox.y1:0}})))}function mt(e){return!e||!Array.isArray(e.lines)?[]:(console.log(`[ExtractLines] Organizing horizontal line blocks. Found count: ${e.lines.length}`),e.lines.map(t=>({text:t.text?t.text.trim():"",bbox:{x0:t.bbox?t.bbox.x0:0,y0:t.bbox?t.bbox.y0:0,x1:t.bbox?t.bbox.x1:0,y1:t.bbox?t.bbox.y1:0}})))}function xe(e){return!e||!Array.isArray(e.words)?[]:(console.log("[ExtractBoundingBoxes] Compiling spatial coordinate box records..."),e.words.map(t=>{const r=t.bbox?t.bbox.x0:0,n=t.bbox?t.bbox.y0:0,o=t.bbox?t.bbox.x1:0,a=t.bbox?t.bbox.y1:0;return{x:r,y:n,width:o-r,height:a-n,confidence:typeof t.confidence=="number"?t.confidence:0,text:t.text||""}}))}async function yt(e){const t=Date.now();console.log("[RecognizeImage] Triggering character recognition loop...");try{if(!e)throw new TypeError("Canvas parameter is required");if(e.width===0||e.height===0)throw new Error("Canvas dimensions cannot be zero");const r=await ht(e);if(!r||!r.data)throw new Error("Tesseract returned an empty or malformed result payload");const{data:n}=r,o=pt(n),a=mt(n),i=xe(n),c=Date.now()-t;return console.log(`[RecognizeImage] OCR successful. Latency: ${c}ms. Text length: ${n.text?n.text.length:0}`),{text:n.text||"",confidence:typeof n.confidence=="number"?n.confidence:0,words:o,lines:a,boundingBoxes:i,processingTime:c}}catch(r){return console.error("[RecognizeImage] OCR processing failed:",r),{text:"",confidence:0,words:[],lines:[],boundingBoxes:[],processingTime:Date.now()-t,error:r instanceof Error?r.message:"Unknown OCR processing exception"}}}const wt={EMAIL:/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,PHONE:/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,AADHAAR:/\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,PAN:/\b[A-Z]{5}[0-9]{4}[A-Z]\b/g,PASSPORT:/\b[A-Z][0-9]{7}\b/g,DRIVING_LICENSE:/\b[A-Z]{2}[0-9]{2}[-\s]?[0-9]{11}\b/g,IFSC:/\b[A-Z]{4}0[A-Z0-9]{6}\b/g,CREDIT_CARD:/\b(?:\d[ -]*?){13,19}\b/g,UPI_ID:/\b[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}\b/g,AWS_ACCESS_KEY:/\bAKIA[A-Z0-9]{16}\b/g,GOOGLE_API_KEY:/\bAIza[Sy][a-zA-Z0-9\-_]{35}\b/g,GITHUB_PAT:/\bghp_[a-zA-Z0-9]{36}\b/g,JWT_TOKEN:/\beyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\b/g,PASSWORD_PATTERNS:/\b(?:password|passwd|secret|passphrase)\s*[:=]\s*([a-zA-Z0-9!@#$%^&*()_+=-]{6,30})\b/gi},bt={EMAIL:.95,PHONE:.85,AADHAAR:.9,PAN:.95,PASSPORT:.9,DRIVING_LICENSE:.9,IFSC:.95,CREDIT_CARD:.8,UPI_ID:.9,AWS_ACCESS_KEY:.99,GOOGLE_API_KEY:.99,GITHUB_PAT:.99,JWT_TOKEN:.95,PASSWORD_PATTERNS:.85};function xt(e,t=[]){if(!e)return[];console.log("[RegexDetector] Running sensitivity patterns scanning...");const r=[],n=vt(e,t);for(const[o,a]of Object.entries(wt)){a.lastIndex=0;let i;for(;(i=a.exec(e))!==null;){const c=i[0],u=i.index,h=u+c.length,p=n.filter(f=>f.startIndex<h&&f.endIndex>u).map(f=>({x:f.x,y:f.y,width:f.width,height:f.height,confidence:f.confidence})),s=p.length>0?p.reduce((f,m)=>f+m.confidence,0)/p.length:0;r.push({type:o,value:c,regexConfidence:bt[o]||.8,ocrConfidence:s/100,startIndex:u,endIndex:h,bboxes:p,source:"regex"})}}return r}function vt(e,t){let r=0;return t.map(n=>{if(!n.text)return{...n,startIndex:-1,endIndex:-1};const o=n.text.trim(),a=e.indexOf(o,r);return a!==-1?(r=a+o.length,{...n,startIndex:a,endIndex:r}):{...n,startIndex:-1,endIndex:-1}})}async function Ct(e){try{return e?(console.log("[MiniLMClassifier] Classifying text semantic structure..."),[{topic:"Financial Statement",score:.94},{topic:"Personal Identifiable Information",score:.88}]):[]}catch(t){throw console.error("[MiniLMClassifier] Semantic classification failed:",t),t}}const Et={EMAIL:"medium",PHONE:"low",AADHAAR:"high",PAN:"high",PASSPORT:"high",DRIVING_LICENSE:"high",IFSC:"medium",CREDIT_CARD:"critical",UPI_ID:"medium",AWS_ACCESS_KEY:"critical",GOOGLE_API_KEY:"critical",GITHUB_PAT:"critical",JWT_TOKEN:"critical",PASSWORD_PATTERNS:"critical"};function It(e){return Array.isArray(e)?e.filter(t=>t.rulePassed===!1?(console.log(`[ConfidenceFusion] Dropping false positive: [${t.type}] "${t.value}" (failed checksum validation).`),!1):!0).map(t=>{const r=typeof t.ocrConfidence=="number"?t.ocrConfidence:.5,n=typeof t.regexConfidence=="number"?t.regexConfidence:.8;let o=.7*n+.3*r;return o=Math.min(1,Math.max(0,o)),{type:t.type,value:t.value,ocrConfidence:r,regexConfidence:n,fusedConfidence:parseFloat(o.toFixed(4)),severity:Et[t.type]||"medium",startIndex:t.startIndex,endIndex:t.endIndex,bboxes:t.bboxes||[],source:t.source||"regex"}}):[]}const At=[[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]],St=[[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,1,4,6,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];function kt(e){const t=e.replace(/[-\s]/g,"");if(t.length!==12||!/^\d{12}$/.test(t)||t[0]==="0"||t[0]==="1")return!1;let r=0;const n=t.split("").map(Number).reverse();for(let o=0;o<n.length;o++)r=At[r][St[o%8][n[o]]];return r===0}function Mt(e){const t=e.replace(/[-\s]/g,"");if(!/^\d{13,19}$/.test(t))return!1;let r=0,n=!1;for(let o=t.length-1;o>=0;o--){let a=parseInt(t.charAt(o),10);n&&(a*=2,a>9&&(a-=9)),r+=a,n=!n}return r%10===0}function Ot(e){const t=/^[A-Z]{5}[0-9]{4}[A-Z]$/,r=e.trim().toUpperCase();return t.test(r)?["P","C","H","F","A","T","B","L","J","G"].includes(r[3]):!1}function Dt(e){const t=e.trim().toUpperCase();return/^[A-PR-WYZ][0-9]{7}$/.test(t)}function Tt(e){const t=e.replace(/[-\s]/g,"").toUpperCase();return/^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7}$/.test(t)}function Pt(e){return Array.isArray(e)?e.map(t=>{let r=!0;try{switch(t.type){case"AADHAAR":r=kt(t.value);break;case"CREDIT_CARD":r=Mt(t.value);break;case"PAN":r=Ot(t.value);break;case"PASSPORT":r=Dt(t.value);break;case"DRIVING_LICENSE":r=Tt(t.value);break;case"IFSC":r=/^[A-Z]{4}0[A-Z0-9]{6}$/.test(t.value.trim().toUpperCase());break;default:r=!0;break}}catch(n){console.warn(`[RuleEngine] Check execution exception for type ${t.type}:`,n),r=!1}return{...t,rulePassed:r}}):[]}function ne(e){if(!Array.isArray(e)||e.length<=1)return e;const t=[...e].sort((o,a)=>o.x-a.x),r=[];let n=t[0];for(let o=1;o<t.length;o++){const a=t[o],i=n.y+n.height,c=a.y+a.height,u=Math.min(i,c)-Math.max(n.y,a.y),h=a.x-(n.x+n.width);if(u>0&&h<=15){const p=Math.min(n.x,a.x),s=Math.min(n.y,a.y),f=Math.max(n.x+n.width,a.x+a.width),m=Math.max(i,c);n={x:p,y:s,width:f-p,height:m-s,confidence:Math.max(n.confidence,a.confidence)}}else r.push(n),n=a}return r.push(n),r}function Rt(e){if(!Array.isArray(e)||e.length<=1)return e||[];const t=[...e].sort((a,i)=>a.startIndex-i.startIndex),r=[];let n=t[0];for(let a=1;a<t.length;a++){const i=t[a];i.startIndex<=n.endIndex?i.rulePassed&&!n.rulePassed||i.rulePassed===n.rulePassed&&i.regexConfidence>n.regexConfidence?n={...i,startIndex:n.startIndex,endIndex:Math.max(n.endIndex,i.endIndex),value:n.value+i.value.substring(Math.max(0,n.endIndex-i.startIndex)),bboxes:ne([...n.bboxes,...i.bboxes])}:n={...n,endIndex:Math.max(n.endIndex,i.endIndex),value:n.value+i.value.substring(Math.max(0,n.endIndex-i.startIndex)),bboxes:ne([...n.bboxes,...i.bboxes])}:(n.bboxes=ne(n.bboxes),r.push(n),n=i)}n.bboxes=ne(n.bboxes),r.push(n);const o=new Set;return r.filter(a=>{const i=`${a.type}_${a.startIndex}_${a.value}`;return o.has(i)?!1:(o.add(i),!0)})}const Lt={critical:10,high:5,medium:2,low:1};function $t(e){if(!Array.isArray(e)||e.length===0)return{riskLevel:"low",score:0,detections:[]};let t=0,r=!1;e.forEach(o=>{const a=Lt[o.severity]||2,i=typeof o.fusedConfidence=="number"?o.fusedConfidence:.8;t+=a*i,o.severity==="critical"&&i>=.7&&(r=!0)});let n="low";return r||t>=15?n="critical":t>=5?n="high":t>=2&&(n="medium"),console.log(`[RiskAnalyzer] Calculated document risk score: ${t.toFixed(2)} -> Level: ${n.toUpperCase()}`),{riskLevel:n,score:parseFloat(t.toFixed(2)),detections:e}}function ve(e){return new Promise((t,r)=>{if(!e)return r(new TypeError("File parameter is required"));const n=new FileReader;n.onload=o=>{const a=new Image;a.onload=()=>{const i=document.createElement("canvas");i.width=a.width,i.height=a.height,i.getContext("2d").drawImage(a,0,0),t(i)},a.onerror=i=>r(new Error(`Failed to decode image pixels: ${i}`)),a.src=o.target.result},n.onerror=o=>r(new Error(`Failed to read file buffer: ${o}`)),n.readAsDataURL(e)})}async function _t(e,t={}){const r=Date.now();console.log(`[ScanService] Initiating scan pipeline for file: ${e.name} (${e.size} bytes)`);try{const n=await ve(e),o=await Fe(n,t.preprocess),a=await yt(o),i=xe(a),c=xt(a.text,i),u=Pt(c),h=await Ct(a.text),p=It(u,h),s=Rt(p),f=$t(s),m=Date.now()-r;return console.log(`[ScanService] Scan pipeline resolved in ${m}ms. Risk: ${f.riskLevel.toUpperCase()}`),{success:!0,riskLevel:f.riskLevel,score:f.score,piiCount:s.length,detections:s,processingTime:m,metadata:{name:e.name,size:e.size,type:e.type}}}catch(n){return console.error("[ScanService] Scan pipeline failed:",n),{success:!1,riskLevel:"low",score:0,piiCount:0,detections:[],processingTime:Date.now()-r,metadata:{name:e.name,size:e.size,type:e.type},error:n instanceof Error?n.message:"Unknown scanning runtime failure"}}}async function Nt(e,t){try{if(!e)throw new TypeError("Canvas parameter is required");const r=e.getContext("2d"),n=e.width,o=e.height,a=r.getImageData(0,0,n,o),i=a.data,c=t*.8;for(let p=0;p<i.length;p+=4){const s=p/4,f=s%n,m=Math.floor(s/n),I=Math.sin(f*.8)*Math.cos(m*.8)*c,M=Math.cos(f*.8)*Math.sin(m*.8)*c,A=Math.sin((f+m)*.5)*c;i[p]=Math.min(255,Math.max(0,i[p]+I)),i[p+1]=Math.min(255,Math.max(0,i[p+1]+M)),i[p+2]=Math.min(255,Math.max(0,i[p+2]+A))}const u=typeof OffscreenCanvas<"u"?new OffscreenCanvas(n,o):document.createElement("canvas");return u.width=n,u.height=o,u.getContext("2d").putImageData(a,0,0),u}catch(r){throw console.error("[Perturbation] Error applying pixel alterations:",r),r}}async function zt(e,t={}){const{strength:r=5}=t;try{if(!e)throw new TypeError("Canvas parameter is required");console.log(`[AICloak] Injecting adversarial cloak (intensity: ${r})...`);const n=await Nt(e,r);return console.log("[AICloak] Adversarial noise mapping completed."),n}catch(n){throw console.error("[AICloak] Failed to apply adversarial cloaking:",n),n}}function Ft(e){const r=Array.from({length:8},()=>new Array(8).fill(0));for(let n=0;n<8;n++)for(let o=0;o<8;o++){let a=0;for(let u=0;u<8;u++)for(let h=0;h<8;h++)a+=e[u][h]*Math.cos((2*u+1)*n*Math.PI/16)*Math.cos((2*h+1)*o*Math.PI/16);const i=n===0?1/Math.sqrt(2):1,c=o===0?1/Math.sqrt(2):1;r[n][o]=.25*i*c*a}return r}function Bt(e){const r=Array.from({length:8},()=>new Array(8).fill(0));for(let n=0;n<8;n++)for(let o=0;o<8;o++){let a=0;for(let i=0;i<8;i++)for(let c=0;c<8;c++){const u=i===0?1/Math.sqrt(2):1,h=c===0?1/Math.sqrt(2):1;a+=u*h*e[i][c]*Math.cos((2*n+1)*i*Math.PI/16)*Math.cos((2*o+1)*c*Math.PI/16)}r[n][o]=.25*a}return r}const L=8,re=20;function Ut(e){const t=[];for(let r=0;r<e.length;r++){const n=e.charCodeAt(r);for(let o=7;o>=0;o--)t.push(n>>o&1)}return t}async function Gt(e,t){try{if(!e)throw new TypeError("Canvas parameter is required");console.log(`[WatermarkEngine] Embedding invisible DCT watermark: "${t}"`);const r=e.getContext("2d"),n=e.width,o=e.height,a=r.getImageData(0,0,n,o),i=a.data,c=Ut(t+"\0");let u=0;const h=Math.floor(n/L)*L,p=Math.floor(o/L)*L;for(let s=0;s<p;s+=L)for(let f=0;f<h;f+=L){const m=Array.from({length:L},()=>new Array(L).fill(0)),I=Array.from({length:L},()=>new Array(L).fill(0)),M=Array.from({length:L},()=>new Array(L).fill(0));for(let b=0;b<L;b++)for(let S=0;S<L;S++){const O=((s+b)*n+(f+S))*4,D=i[O],P=i[O+1],z=i[O+2];m[b][S]=.299*D+.587*P+.114*z,I[b][S]=128-.1687*D-.3313*P+.5*z,M[b][S]=128+.5*D-.4187*P-.0813*z}const A=Ft(m);if(u<c.length){const b=c[u],S=A[4][4],O=Math.round(S/re)*re;A[4][4]=b===1?O+re/4:O-re/4,u++}const v=Bt(A);for(let b=0;b<L;b++)for(let S=0;S<L;S++){const O=((s+b)*n+(f+S))*4,D=v[b][S],P=I[b][S],z=M[b][S];let R=Math.round(D+1.402*(z-128)),T=Math.round(D-.3441*(P-128)-.7141*(z-128)),_=Math.round(D+1.772*(P-128));i[O]=Math.max(0,Math.min(255,R)),i[O+1]=Math.max(0,Math.min(255,T)),i[O+2]=Math.max(0,Math.min(255,_))}}return r.putImageData(a,0,0),e}catch(r){throw console.error("[WatermarkEngine] Failed to embed watermark:",r),r}}function Wt(e,t=8,r=6,n=99999,o=99999){if(!e)throw new TypeError("Box object is required");const a=Math.max(0,e.x-t),i=Math.max(0,e.y-r),c=Math.min(n,e.x+e.width+t),u=Math.min(o,e.y+e.height+r),h=c-a,p=u-i;return{x:a,y:i,width:h,height:p}}function qt(e){if(!Array.isArray(e)||e.length===0)return[];if(e.length===1){const o=e[0];return[{x:o.x,y:o.y,width:o.width,height:o.height,detections:o.detection?[o.detection]:[]}]}console.log(`[MergeBoundingBoxes] Consolidating ${e.length} bounding boxes...`);const t=[...e].sort((o,a)=>o.x-a.x),r=[];let n={x:t[0].x,y:t[0].y,width:t[0].width,height:t[0].height,detections:t[0].detection?[t[0].detection]:[]};for(let o=1;o<t.length;o++){const a=t[o],i=n.x+n.width,c=n.y+n.height,u=a.x+a.width,h=a.y+a.height,p=a.x<=i+15,s=Math.min(c,h)-Math.max(n.y,a.y)>0;if(p&&s){const f=Math.min(n.x,a.x),m=Math.max(i,u),I=Math.min(n.y,a.y),M=Math.max(c,h);n.x=f,n.width=m-f,n.y=I,n.height=M-I,a.detection&&(n.detections.some(v=>v.type===a.detection.type&&v.value===a.detection.value)||n.detections.push(a.detection))}else r.push(n),n={x:a.x,y:a.y,width:a.width,height:a.height,detections:a.detection?[a.detection]:[]}}return r.push(n),console.log(`[MergeBoundingBoxes] Consolidated into ${r.length} final bounding rectangles.`),r}async function Ce(e,t,r=15){if(!e)throw new TypeError("Canvas parameter is required");if(!Array.isArray(t)||t.length===0)return e;const n=e.getContext("2d");n.save();try{t.forEach(o=>{const{x:a,y:i,width:c,height:u}=o,h=Math.max(0,a),p=Math.max(0,i),s=Math.min(e.width-h,c),f=Math.min(e.height-p,u);if(s<=0||f<=0)return;const m=typeof OffscreenCanvas<"u"?new OffscreenCanvas(s,f):document.createElement("canvas");m.width=s,m.height=f,m.getContext("2d").drawImage(e,h,p,s,f,0,0,s,f),n.save(),n.beginPath(),n.rect(h,p,s,f),n.clip(),n.filter=`blur(${r}px)`,n.drawImage(m,h,p),n.restore()})}catch(o){throw console.error("[BlurCanvas] Regional Gaussian blur execution failed:",o),o}finally{n.restore()}return e}function Yt(e){const r=typeof OffscreenCanvas<"u"&&e instanceof OffscreenCanvas?new OffscreenCanvas(e.width,e.height):document.createElement("canvas");return r.width=e.width,r.height=e.height,r.getContext("2d").drawImage(e,0,0),r}async function jt(e,t,r="redact",n={}){if(!e)throw new TypeError("Canvas parameter is required");const o=Yt(e);if(!Array.isArray(t)||t.length===0)return o;const{paddingX:a=8,paddingY:i=6,blurRadius:c=15,pixelationScale:u=8,fillStyle:h="#000000"}=n;console.log(`[RedactCanvas] Running masking pipeline. Mode: ${r.toUpperCase()} on ${t.length} regions.`);const p=t.map(m=>Wt(m,a,i,o.width,o.height)),s=qt(p),f=o.getContext("2d");return r==="redact"?(f.fillStyle=h,s.forEach(m=>{const I=Math.max(0,m.x),M=Math.max(0,m.y),A=Math.min(o.width-I,m.width),v=Math.min(o.height-M,m.height);A>0&&v>0&&f.fillRect(I,M,A,v)})):r==="blur"?await Ce(o,s,c):r==="pixelate"&&Ht(o,s,u),o}function Ht(e,t,r=8){const n=e.getContext("2d");t.forEach(o=>{const{x:a,y:i,width:c,height:u}=o,h=Math.max(0,a),p=Math.max(0,i),s=Math.min(e.width-h,c),f=Math.min(e.height-p,u);if(s<=0||f<=0)return;const m=n.getImageData(h,p,s,f),I=m.data;for(let M=0;M<f;M+=r)for(let A=0;A<s;A+=r){let v=0,b=0,S=0,O=0;for(let R=0;R<r&&M+R<f;R++)for(let T=0;T<r&&A+T<s;T++){const _=((M+R)*s+(A+T))*4;v+=I[_],b+=I[_+1],S+=I[_+2],O++}const D=Math.round(v/O),P=Math.round(b/O),z=Math.round(S/O);for(let R=0;R<r&&M+R<f;R++)for(let T=0;T<r&&A+T<s;T++){const _=((M+R)*s+(A+T))*4;I[_]=D,I[_+1]=P,I[_+2]=z}}n.putImageData(m,h,p)})}async function Zt(e,t){return console.log("[AIService] Delegating adversarial cloaking request..."),zt(e,{strength:t})}async function Vt(e,t){return console.log("[AIService] Delegating invisible watermark embedding..."),Gt(e,t)}async function Jt(e,t,r="redact"){return console.log(`[AIService] Delegating redaction request (mode: ${r}) for ${t.length} regions.`),r==="blur"?Ce(e,t,8):jt(e,t,{fillStyle:"#000000"})}async function Kt(e,t,r={}){const{blurMode:n="redact"}=r;try{if(!e)throw new TypeError("Canvas parameter is required");if(!Array.isArray(t)||t.length===0)return e;const o=[];return t.forEach(i=>{Array.isArray(i.bboxes)&&i.bboxes.forEach(c=>{o.push({x:c.x,y:c.y,width:c.width,height:c.height})})}),o.length===0?(console.log("[BlurService] No bounding boxes found in detections. Skipping redaction."),e):(console.log(`[BlurService] Requesting redaction of ${o.length} bounding boxes in mode: ${n}`),await Jt(e,o,n))}catch(o){throw console.error("[BlurService] Redaction processing failed:",o),o}}const W=8,$=32;async function Xt(e){try{if(!e)throw new TypeError("Canvas parameter is required");const t=typeof OffscreenCanvas<"u"?new OffscreenCanvas($,$):document.createElement("canvas");t.width=$,t.height=$;const r=t.getContext("2d");r.drawImage(e,0,0,$,$);const o=r.getImageData(0,0,$,$).data,a=new Float32Array($*$);for(let s=0;s<o.length;s+=4)a[s/4]=.299*o[s]+.587*o[s+1]+.114*o[s+2];const i=Array.from({length:W},()=>new Float32Array(W));for(let s=0;s<W;s++)for(let f=0;f<W;f++){let m=0;for(let A=0;A<$;A++)for(let v=0;v<$;v++)m+=a[A*$+v]*Math.cos((2*A+1)*s*Math.PI/(2*$))*Math.cos((2*v+1)*f*Math.PI/(2*$));const I=s===0?1/Math.sqrt(2):1,M=f===0?1/Math.sqrt(2):1;i[s][f]=2/$*I*M*m}let c=0;for(let s=0;s<W;s++)for(let f=0;f<W;f++)s===0&&f===0||(c+=i[s][f]);const u=c/(W*W-1);let h="";for(let s=0;s<W;s++)for(let f=0;f<W;f++)h+=i[s][f]>=u?"1":"0";let p="";for(let s=0;s<64;s+=4){const f=h.substring(s,s+4);p+=parseInt(f,2).toString(16)}return p}catch(t){throw console.error("[PHash] Error generating perceptual hash:",t),t}}const q=8,k=16;function Ee(e,t){const r=new Float32Array(t),n=t/2;for(let o=0;o<n;o++){const a=e[2*o],i=e[2*o+1];r[o]=(a+i)/Math.sqrt(2),r[n+o]=(a-i)/Math.sqrt(2)}for(let o=0;o<t;o++)e[o]=r[o]}function Qt(e){for(let t=0;t<k;t++){const r=new Float32Array(k);for(let n=0;n<k;n++)r[n]=e[t*k+n];Ee(r,k);for(let n=0;n<k;n++)e[t*k+n]=r[n]}for(let t=0;t<k;t++){const r=new Float32Array(k);for(let n=0;n<k;n++)r[n]=e[n*k+t];Ee(r,k);for(let n=0;n<k;n++)e[n*k+t]=r[n]}}async function en(e){try{if(!e)throw new TypeError("Canvas parameter is required");const t=typeof OffscreenCanvas<"u"?new OffscreenCanvas(k,k):document.createElement("canvas");t.width=k,t.height=k;const r=t.getContext("2d");r.drawImage(e,0,0,k,k);const o=r.getImageData(0,0,k,k).data,a=new Float32Array(k*k);for(let s=0;s<o.length;s+=4)a[s/4]=.299*o[s]+.587*o[s+1]+.114*o[s+2];Qt(a);const i=Array.from({length:q},()=>new Float32Array(q));let c=0;for(let s=0;s<q;s++)for(let f=0;f<q;f++){const m=a[s*k+f];i[s][f]=m,c+=m}const u=c/(q*q);let h="";for(let s=0;s<q;s++)for(let f=0;f<q;f++)h+=i[s][f]>=u?"1":"0";let p="";for(let s=0;s<64;s+=4){const f=h.substring(s,s+4);p+=parseInt(f,2).toString(16)}return p}catch(t){throw console.error("[WHash] Error generating wavelet hash:",t),t}}function tn(e,t,r){return new Promise((n,o)=>{if(!e)return o(new TypeError("Canvas parameter is required"));e.toBlob(a=>{if(!a)return o(new Error("Failed to extract binary blob from canvas"));const i=t.replace(/(\.[\w\d]+)$/,"_protected$1"),c=new File([a],i,{type:r,lastModified:Date.now()});n(c)},r)})}async function nn(e,t={}){console.log(`[ProtectService] Initiating final protection pipeline for: ${e.name}`);try{const r=await ve(e),n=await Xt(r),o=await en(r);console.log("[ProtectService] Generated original fingerprints:",{phash:n,whash:o});const a=await _t(e,{preprocess:t});if(!a.success)throw new Error(`Scanning phase failed: ${a.error}`);if(!(a.riskLevel!=="low"||t.autoRedact))return console.log("[ProtectService] Document evaluated as low risk. Skipping edits."),{success:!0,protectedFile:e,phash:n,whash:o,metadata:{name:e.name,size:e.size,type:e.type},detections:[],risk:a.riskLevel};console.log(`[ProtectService] Applying visual protections (Mode: ${t.blurMode||"redact"})...`);let c=await Kt(r,a.detections,t);t.aiCloakEnabled&&(c=await Zt(c,5)),t.watermarkEnabled&&(c=await Vt(c,"SafeLens_Protected_Asset"));const u=await tn(c,e.name,e.type);return console.log(`[ProtectService] Protection pipeline complete. Output file: ${u.name}`),{success:!0,protectedFile:u,phash:n,whash:o,metadata:{name:e.name,size:e.size,type:e.type},detections:a.detections,risk:a.riskLevel}}catch(r){return console.error("[ProtectService] Critical pipeline crash:",r),{success:!1,protectedFile:e,phash:"",whash:"",metadata:{name:e.name,size:e.size,type:e.type},detections:[],risk:"low",error:r instanceof Error?r.message:"Unknown protection pipeline failure"}}}async function rn(e,t,r,n){console.log("[UploadInterceptor] Intercepting upload event for files:",t.map(o=>o.name));try{let o={protectionEnabled:!0,autoProtect:!1};if(typeof chrome<"u"&&chrome.storage&&chrome.storage.local){const i=await chrome.storage.local.get("settings");i.settings&&(o=i.settings)}if(o.protectionEnabled===!1)return console.log("[UploadInterceptor] Shield is suspended. Resuming original upload."),n(e);if(o.autoProtect===!0||o.autoRedact===!0){console.log("[UploadInterceptor] Auto Protect is ON. Running protection pipeline immediately...");const c=(await Ie(e,o)).map(u=>u.protectedFile);n(c)}else{const i=await Pe(e,t);if(i==="protect"){console.log("[UploadInterceptor] User selected: PROTECT. Executing pipeline...");const u=(await Ie(e,o)).map(h=>h.protectedFile);n(u)}else i==="anyway"?(console.log("[UploadInterceptor] User selected: UPLOAD ANYWAY. Re-triggering original files."),n(e)):console.log("[UploadInterceptor] User selected: CANCEL. Upload aborted.")}}catch(o){console.error("[UploadInterceptor] Interception pipeline failure:",o),n(e)}}async function Ie(e,t){const r=await Promise.all(e.map(n=>nn(n,t)));return r.forEach(async n=>{if(n.success)try{const o=n.detections.reduce((a,i)=>Math.max(a,i.fusedConfidence||0),0)||.8;await chrome.runtime.sendMessage({type:"LOG_SCAN",payload:{scanId:`scan_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,fileName:n.originalFile.name,size:n.originalFile.size,riskLevel:n.risk,confidence:parseFloat(o.toFixed(2)),piiCount:n.detections.length,processingTime:n.protectionSummary.processingTime,status:n.protectionSummary.redacted?"protected":"passed",detections:n.detections}})}catch(o){console.warn("[UploadInterceptor] Failed to log scan result:",o)}}),r}const on=Object.freeze(Object.defineProperty({__proto__:null,interceptUpload:rn},Symbol.toStringTag,{value:"Module"}));let Ae=null;const Z=new Map;function Se(e){return e.isSafeLensTriggered===!0||e.detail&&e.detail.isSafeLensTriggered===!0}function V(e){return function(t){if(Se(t))return;let r=null;const n=t.currentTarget||t.target;if(e==="change"&&t.target.files?r=t.target.files:e==="drop"&&t.dataTransfer?r=t.dataTransfer.files:e==="paste"&&t.clipboardData&&(r=t.clipboardData.files),!r||r.length===0)return;t.preventDefault(),t.stopImmediatePropagation(),De(r,n,a=>{console.log(`[DOMObserver] Re-injecting and triggering event: ${e}`,{fileCount:a.length});const i=new DataTransfer;if(Array.from(a).forEach(c=>i.items.add(c)),e==="change"){n.files=i.files;const c=new Event("change",{bubbles:!0,cancelable:!0});c.isSafeLensTriggered=!0,n.dispatchEvent(c)}else if(e==="drop"){const c=new DragEvent("drop",{bubbles:!0,cancelable:!0,dataTransfer:i});c.isSafeLensTriggered=!0,n.dispatchEvent(c)}else if(e==="paste"){const c=new ClipboardEvent("paste",{bubbles:!0,cancelable:!0,clipboardData:i});c.isSafeLensTriggered=!0,n.dispatchEvent(c)}},on)}}function ke(e){Se(e)||e.preventDefault()}function Y(e,t,r){if(Z.size>200)for(const o of Z.keys())o.isConnected||Z.delete(o);Z.has(e)||Z.set(e,{});const n=Z.get(e);n[t]||(e.addEventListener(t,r,!0),n[t]=r)}function Me(e){if(!e||typeof e.querySelectorAll!="function")return;e.querySelectorAll('input[type="file"]').forEach(o=>{Y(o,"change",V("change"))}),e.querySelectorAll('[class*="drop"], [class*="upload"], [id*="drop"], [id*="upload"], [role="button"]').forEach(o=>{Y(o,"dragover",ke),Y(o,"drop",V("drop"))}),e.querySelectorAll('textarea, [contenteditable="true"]').forEach(o=>{Y(o,"paste",V("paste"))})}function an(){console.log("[DOMObserver] Initializing DOM Observer..."),Me(document),document.body&&(Ae=new MutationObserver(e=>{for(const t of e)t.type==="childList"&&t.addedNodes.forEach(r=>{r.nodeType===Node.ELEMENT_NODE&&Me(r)})}),Ae.observe(document.body,{childList:!0,subtree:!0})),Y(document,"change",V("change")),Y(document,"dragover",ke),Y(document,"drop",V("drop")),Y(document,"paste",V("paste"))}console.log("[SafeLens] Content Script successfully injected.");try{an()}catch(e){console.error("[SafeLens] Failed to initialize content observers:",e)}})();
