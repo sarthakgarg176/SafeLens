@@ -1,74 +1,103 @@
 /**
- * Grayscale Image Preprocessor
+ * OpenCV.js Grayscale Image Preprocessor
  * 
  * Responsibility:
- * - Converts color images (RGB/RGBA) into grayscale.
- * - Improves text contrast for OCR processing.
+ * - Converts color images (RGBA) into grayscale to simplify character segmentation.
+ * - Uses OpenCV `cv.cvtColor` with `cv.COLOR_RGBA2GRAY`.
+ * - Explicitly releases WebAssembly Mat buffers to avoid memory leaks.
+ * - Falls back to JavaScript luminosity formulas if OpenCV is unavailable.
  * 
  * Input/Output Contract:
- * - Input: HTMLCanvasElement or ImageData
- * - Output: Promise<HTMLCanvasElement> (Grayscale rendered canvas)
+ * - Input: HTMLCanvasElement or OffscreenCanvas
+ * - Output: Promise<HTMLCanvasElement|OffscreenCanvas> (Grayscale canvas)
  * 
  * Interacts with:
- * - extension/src/ai/preprocessing/preprocessImage.js (Invokes this as step 1)
+ * - extension/src/ai/preprocessing/preprocessImage.js
  */
 
 /**
- * Converts a colored canvas or image data object to grayscale.
+ * Converts a colored canvas to grayscale using OpenCV.js.
  * 
- * @param {HTMLCanvasElement|ImageData} imageSource - The source canvas or image pixel data
- * @returns {Promise<HTMLCanvasElement>} A promise resolving to a new canvas containing grayscale pixels
- * @throws {TypeError} If the input is not a valid Canvas or ImageData
+ * @param {HTMLCanvasElement|OffscreenCanvas} canvas - Source colored canvas
+ * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Grayscale canvas
  */
-export async function toGrayscale(imageSource) {
+export async function toGrayscale(canvas) {
+  if (!canvas) {
+    throw new TypeError('Canvas parameter is required');
+  }
+
+  let src = null;
+  let gray = null;
+  let rgbaMat = null;
+
   try {
-    if (!imageSource) {
-      throw new TypeError('Image source is required');
+    // Verify OpenCV global context is ready
+    if (typeof cv === 'undefined' || !cv.cvtColor) {
+      throw new Error('OpenCV.js runtime is not loaded');
     }
 
-    // Determine canvas and context
-    let canvas;
-    let ctx;
-
-    if (imageSource instanceof HTMLCanvasElement) {
-      canvas = document.createElement('canvas');
-      canvas.width = imageSource.width;
-      canvas.height = imageSource.height;
-      ctx = canvas.getContext('2d');
-      ctx.drawImage(imageSource, 0, 0);
-    } else if (imageSource instanceof ImageData) {
-      canvas = document.createElement('canvas');
-      canvas.width = imageSource.width;
-      canvas.height = imageSource.height;
-      ctx = canvas.getContext('2d');
-      ctx.putImageData(imageSource, 0, 0);
-    } else {
-      throw new TypeError('Invalid input type. Must be HTMLCanvasElement or ImageData.');
-    }
-
+    const ctx = canvas.getContext('2d');
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
 
-    // Apply grayscale conversion (using luminosity coefficients)
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      
-      // Luminosity formula: 0.299R + 0.587G + 0.114B
-      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      
-      data[i] = gray;     // Red
-      data[i + 1] = gray; // Green
-      data[i + 2] = gray; // Blue
-      // Alpha channel (data[i+3]) remains unmodified
-    }
+    // 1. Allocate WebAssembly Mat buffers
+    src = cv.matFromImageData(imgData);
+    gray = new cv.Mat();
 
-    ctx.putImageData(imgData, 0, 0);
-    return canvas;
+    // 2. Convert RGBA to Grayscale (single channel 8-bit)
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+    // 3. Convert back to RGBA to render on browser canvas element
+    rgbaMat = new cv.Mat();
+    cv.cvtColor(gray, rgbaMat, cv.COLOR_GRAY2RGBA);
+
+    const outputCanvas = typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(canvas.width, canvas.height)
+      : document.createElement('canvas');
+    outputCanvas.width = canvas.width;
+    outputCanvas.height = canvas.height;
+
+    const outCtx = outputCanvas.getContext('2d');
+    const outImgData = new ImageData(new Uint8ClampedArray(rgbaMat.data), rgbaMat.cols, rgbaMat.rows);
+    outCtx.putImageData(outImgData, 0, 0);
+
+    return outputCanvas;
 
   } catch (error) {
-    console.error('[Grayscale] Error converting image:', error);
-    throw error;
+    console.warn('[Grayscale] OpenCV conversion failed. Falling back to native JS luminosity conversions:', error);
+    
+    // Graceful Fallback: JS-based Luminosity Formula (0.299R + 0.587G + 0.114B)
+    try {
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const luminance = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+        
+        data[i] = luminance;     // R
+        data[i + 1] = luminance; // G
+        data[i + 2] = luminance; // B
+      }
+
+      const fallbackCanvas = typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(canvas.width, canvas.height)
+        : document.createElement('canvas');
+      fallbackCanvas.width = canvas.width;
+      fallbackCanvas.height = canvas.height;
+      
+      fallbackCanvas.getContext('2d').putImageData(imgData, 0, 0);
+      return fallbackCanvas;
+    } catch (fallbackError) {
+      console.error('[Grayscale] JS grayscale fallback failed. Returning original image.', fallbackError);
+      return canvas;
+    }
+  } finally {
+    // Explicit deallocation of WebAssembly objects
+    if (src) src.delete();
+    if (gray) gray.delete();
+    if (rgbaMat) rgbaMat.delete();
   }
 }

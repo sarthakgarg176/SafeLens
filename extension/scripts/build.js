@@ -118,6 +118,14 @@ async function runBuild() {
       console.log(`Successfully copied ${files.length} icon files to dist/icons/`);
     }
 
+    const opencvSrc = resolve(publicDir, 'opencv.js');
+    const opencvDest = resolve(distDir, 'opencv.js');
+    if (fs.existsSync(opencvSrc)) {
+      console.log('Copying opencv.js to dist/... (this may take a moment)');
+      fs.copyFileSync(opencvSrc, opencvDest);
+      console.log('Successfully copied opencv.js to dist/');
+    }
+
     console.log('\nSafeLens Extension build completed successfully!');
   } catch (error) {
     console.error('SafeLens Extension build failed:', error);

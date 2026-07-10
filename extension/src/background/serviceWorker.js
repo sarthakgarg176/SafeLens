@@ -1,3 +1,16 @@
+// Initialize Module settings for OpenCV WASM loading
+self.Module = {
+  onRuntimeInitialized: () => {
+    console.log('[ServiceWorker] OpenCV.js (WASM) initialized successfully.');
+  }
+};
+
+try {
+  importScripts('/opencv.js');
+} catch (err) {
+  console.error('[ServiceWorker] Failed to load OpenCV.js:', err);
+}
+
 import { routeMessage } from './messageRouter.js';
 
 /**
