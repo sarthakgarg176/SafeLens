@@ -1,29 +1,49 @@
 import { fileToCanvas, runScanPipeline } from './scanService.js';
 import { applyRedactions } from './blurService.js';
 import { applyAdversarialCloak, applyWatermark } from './aiService.js';
+import { generatePHash } from '../ai/hashing/perceptualHash.js';
+import { generateWHash } from '../ai/hashing/waveletHash.js';
 
 /**
- * Privacy Shield Orchestration Service
+ * Privacy Shield Orchestration Service (Final Version)
  * 
  * Responsibility:
- * - Directs the complete security processing loop for file uploads.
- * - Converts files to canvas, runs OCR/scan detection, and evaluates protection decisions.
- * - Progressively applies:
- *   1. Solid/Blur Redactions
- *   2. Adversarial Cloaking (Adversarial noise)
- *   3. Invisible Ownership Watermarking
+ * - Coordinates the complete, sequentially coupled client-side protection loop.
+ * - Converts input image Files to canvas buffers.
+ * - Computes perceptual (pHash) and wavelet (wHash) fingerprints from the ORIGINAL canvas
+ *   before any edits or filters are drawn, preserving document identity.
+ * - Runs the multi-modal scan detection pipeline.
+ * - Evaluates risk levels and applies conditional alterations on cloned canvas states:
+ *   1. Solid color redaction / pixelation / Gaussian blur masking.
+ *   2. Structured adversarial AI cloaking (Sine/Cosine checkerboard wave).
+ *   3. Invisible DCT frequency-domain watermarking (QIM on Y luminance).
  * - Converts the final canvas buffer back to a standard browser File object.
+ * 
+ * Input/Output Contract:
+ * - Input: File (original upload), settings (Object)
+ * - Output: Promise<{
+ *     success: boolean,
+ *     protectedFile: File,
+ *     phash: string,
+ *     whash: string,
+ *     metadata: { name: string, size: number, type: string },
+ *     detections: Object[],
+ *     risk: 'low'|'medium'|'high'|'critical',
+ *     error?: string
+ *   }>
  * 
  * Interacts with:
  * - extension/src/services/scanService.js
  * - extension/src/services/blurService.js
- * - extension/src/services/aiService.js
+ * - extension/src/ai/hashing/ (perceptualHash.js, waveletHash.js)
+ * - extension/src/ai/cloaking/ (aiCloak.js)
+ * - extension/src/ai/watermark/ (watermarkEngine.js)
  */
 
 /**
  * Converts an HTMLCanvasElement back to a browser File object.
  * 
- * @param {HTMLCanvasElement} canvas - Target canvas
+ * @param {HTMLCanvasElement|OffscreenCanvas} canvas - Target canvas
  * @param {string} originalName - Original filename
  * @param {string} mimeType - Original MIME type
  * @returns {Promise<File>} The new protected File
@@ -55,58 +75,77 @@ export function canvasToFile(canvas, originalName, mimeType) {
  * Processes an input File through the entire protection pipeline based on user settings.
  * 
  * Pipeline flow:
- * OpenCV/Preprocess -> OCR -> Detection -> Confidence Fusion -> Risk Analysis 
- *    -> Decision -> Redaction Masking -> AI Cloaking -> DCT Watermark -> File Output
+ * File -> Canvas -> Hash (pHash/wHash) -> Scan (OCR/Detection) -> Decision 
+ *      -> Redaction Masking -> AI Cloaking -> DCT Watermark -> File Output
  * 
  * @param {File} file - Original uploaded File
  * @param {Object} settings - User settings configuration
  * @returns {Promise<{
  *   success: boolean,
  *   protectedFile: File,
- *   scanResult: Object
+ *   phash: string,
+ *   whash: string,
+ *   metadata: { name: string, size: number, type: string },
+ *   detections: Object[],
+ *   risk: 'low'|'medium'|'high'|'critical'
  * }>} Protected file and scan metrics report
  */
 export async function protectImagePipeline(file, settings = {}) {
-  console.log(`[ProtectService] Starting protection pipeline for: ${file.name}`);
+  console.log(`[ProtectService] Initiating final protection pipeline for: ${file.name}`);
 
   try {
-    // 1. Convert File to Canvas (needed for redaction and modifications)
+    // 1. Convert original File to Canvas buffer
     const canvas = await fileToCanvas(file);
 
-    // 2. Run the Scan Pipeline to detect threats
+    // 2. Generate content-identifying fingerprints from the ORIGINAL image
+    // (Hashes are computed before protection filters so they identify the source content identity)
+    const phash = await generatePHash(canvas);
+    const whash = await generateWHash(canvas);
+
+    console.log(`[ProtectService] Generated original fingerprints:`, { phash, whash });
+
+    // 3. Run the Scan Pipeline to detect PII threats (uses settings for OCR/Threshold limits)
     const scanResult = await runScanPipeline(file, { preprocess: settings });
     if (!scanResult.success) {
       throw new Error(`Scanning phase failed: ${scanResult.error}`);
     }
 
-    // 3. Make Decision: Apply protection if risk is detected or if forced in settings
+    // 4. Evaluate Protection Decision: apply filters if risk matches threshold or if forced
     const shouldProtect = scanResult.riskLevel !== 'low' || settings.autoRedact;
-    
+
     if (!shouldProtect) {
-      console.log('[ProtectService] Risk is LOW. Skipping protection adjustments.');
+      console.log('[ProtectService] Document evaluated as low risk. Skipping edits.');
       return {
         success: true,
         protectedFile: file, // Return original file unmodified
-        scanResult
+        phash,
+        whash,
+        metadata: {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        },
+        detections: [],
+        risk: scanResult.riskLevel
       };
     }
 
-    console.log('[ProtectService] Threat detected. Applying protective alterations...');
+    console.log(`[ProtectService] Applying visual protections (Mode: ${settings.blurMode || 'redact'})...`);
 
-    // 4. Apply solid color redaction or pixelation blurs
+    // 5. Apply Solid Black / Gaussian Blur / Block Pixelation redactions
     let modifiedCanvas = await applyRedactions(canvas, scanResult.detections, settings);
 
-    // 5. Apply Adversarial AI Cloaking if enabled
+    // 6. Apply Adversarial AI Cloaking (if enabled)
     if (settings.aiCloakEnabled) {
       modifiedCanvas = await applyAdversarialCloak(modifiedCanvas, 5);
     }
 
-    // 6. Apply Invisible Watermarking if enabled
+    // 7. Apply Invisible DCT Watermarking (if enabled)
     if (settings.watermarkEnabled) {
       modifiedCanvas = await applyWatermark(modifiedCanvas, 'SafeLens_Protected_Asset');
     }
 
-    // 7. Convert the final modified Canvas back into a File object
+    // 8. Convert the final modified Canvas back into a File object
     const protectedFile = await canvasToFile(modifiedCanvas, file.name, file.type);
 
     console.log(`[ProtectService] Protection pipeline complete. Output file: ${protectedFile.name}`);
@@ -114,15 +153,31 @@ export async function protectImagePipeline(file, settings = {}) {
     return {
       success: true,
       protectedFile,
-      scanResult
+      phash,
+      whash,
+      metadata: {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      },
+      detections: scanResult.detections,
+      risk: scanResult.riskLevel
     };
 
   } catch (error) {
-    console.error('[ProtectService] Protection pipeline failed:', error);
+    console.error('[ProtectService] Critical pipeline crash:', error);
     return {
       success: false,
       protectedFile: file, // Fallback to original file on failure
-      scanResult: null,
+      phash: '',
+      whash: '',
+      metadata: {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      },
+      detections: [],
+      risk: 'low',
       error: error instanceof Error ? error.message : 'Unknown protection pipeline failure'
     };
   }

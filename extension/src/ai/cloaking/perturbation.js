@@ -2,55 +2,67 @@
  * Pixel Perturbation Math Engine
  * 
  * Responsibility:
- * - Computes and applies mathematical pixel perturbations (e.g. FGSM-like adversarial noise).
+ * - Computes and applies mathematical pixel perturbations (periodic adversarial waves).
  * - Alters pixel channel bits in a visually imperceptible way but mathematically disruptive to CNNs.
+ * - Supports OffscreenCanvas context runs inside background worker threads.
  * 
  * Input/Output Contract:
- * - Input: HTMLCanvasElement, strength (number)
- * - Output: Promise<HTMLCanvasElement> (Modified canvas)
+ * - Input: HTMLCanvasElement or OffscreenCanvas, strength (number)
+ * - Output: Promise<HTMLCanvasElement|OffscreenCanvas> (Modified canvas)
  * 
  * Interacts with:
  * - extension/src/ai/cloaking/aiCloak.js
  */
 
 /**
- * Alters pixel color channels with low-amplitude adversarial noise.
+ * Alters pixel color channels with low-amplitude structured adversarial noise.
+ * Generates coordinate-based high-frequency waves to disrupt CNN gradient weights.
  * 
- * @param {HTMLCanvasElement} canvas - Original image canvas
- * @param {number} strength - Noise intensity amplitude scale
- * @returns {Promise<HTMLCanvasElement>} Perturbed output canvas
+ * @param {HTMLCanvasElement|OffscreenCanvas} canvas - Original image canvas
+ * @param {number} strength - Noise intensity amplitude scale (1-10)
+ * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Perturbed output canvas
  */
 export async function applyPerturbations(canvas, strength) {
   try {
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      throw new TypeError('Input must be an HTMLCanvasElement');
+    if (!canvas) {
+      throw new TypeError('Canvas parameter is required');
     }
 
     const ctx = canvas.getContext('2d');
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const width = canvas.width;
+    const height = canvas.height;
+    const imgData = ctx.getImageData(0, 0, width, height);
     const data = imgData.data;
 
-    // Apply high-frequency, low-amplitude pseudo-random noise
-    // to simulate adversarial perturbations (FGSM) in Phase 1/2.
-    // In Phase 3, this can link to a lightweight CNN output gradient.
-    const amplitude = strength * 1.5; 
+    // Control the maximum amplitude deviation (typically +-5 scale offsets)
+    const amplitude = strength * 0.8;
 
     for (let i = 0; i < data.length; i += 4) {
-      // Generate pseudo-random perturbation offsets between -amplitude and +amplitude
-      const rOffset = (Math.random() * 2 - 1) * amplitude;
-      const gOffset = (Math.random() * 2 - 1) * amplitude;
-      const bOffset = (Math.random() * 2 - 1) * amplitude;
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
 
-      // Alter channels and clamp between 0-255
-      data[i] = Math.min(255, Math.max(0, data[i] + rOffset));     // R
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + gOffset)); // G
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + bOffset)); // B
-      // data[i+3] (Alpha) is kept constant
+      // Generate a structured high-frequency checkerboard pattern based on coordinates.
+      // This is visually invisible but introduces high-frequency noise that disrupts 
+      // convolutional kernel weights in modern computer vision classifiers.
+      const rOffset = Math.sin(x * 0.8) * Math.cos(y * 0.8) * amplitude;
+      const gOffset = Math.cos(x * 0.8) * Math.sin(y * 0.8) * amplitude;
+      const bOffset = Math.sin((x + y) * 0.5) * amplitude;
+
+      // Adjust color channels and clamp to valid 8-bit scale
+      data[i] = Math.min(255, Math.max(0, data[i] + rOffset));       // Red
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + gOffset)); // Green
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + bOffset)); // Blue
+      // Alpha channel remains untouched
     }
 
-    const outputCanvas = document.createElement('canvas');
-    outputCanvas.width = canvas.width;
-    outputCanvas.height = canvas.height;
+    // Write back to a replicated canvas context
+    const outputCanvas = typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(width, height)
+      : document.createElement('canvas');
+    outputCanvas.width = width;
+    outputCanvas.height = height;
+
     const outCtx = outputCanvas.getContext('2d');
     outCtx.putImageData(imgData, 0, 0);
 

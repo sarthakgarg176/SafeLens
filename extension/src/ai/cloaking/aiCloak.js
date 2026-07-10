@@ -5,32 +5,32 @@ import { applyPerturbations } from './perturbation.js';
  * 
  * Responsibility:
  * - Coordinates adversarial cloaking algorithms on face or document images.
- * - Injects imperceptible pixel perturbations to disrupt web-scraping AI trackers
- *   (e.g., preventing face recognition engines or document classifiers from scraping).
+ * - Injects imperceptible pixel perturbations to disrupt web-scraping AI trackers.
+ * - Supports OffscreenCanvas context runs inside background worker threads.
  * 
  * Input/Output Contract:
- * - Input: HTMLCanvasElement, options ({ strength: number })
- * - Output: Promise<HTMLCanvasElement> (Cloaked canvas containing adversarial noise)
+ * - Input: HTMLCanvasElement or OffscreenCanvas, options ({ strength: number })
+ * - Output: Promise<HTMLCanvasElement|OffscreenCanvas> (Cloaked canvas)
  * 
  * Interacts with:
- * - extension/src/ai/cloaking/perturbation.js (Applies mathematical pixel noise calculations)
- * - extension/src/services/protectPipeline.js (Processes final visual protections)
+ * - extension/src/ai/cloaking/perturbation.js
+ * - extension/src/services/protectService.js
  */
 
 /**
  * Applies adversarial cloaking perturbations to the canvas.
  * 
- * @param {HTMLCanvasElement} canvas - Target image canvas
+ * @param {HTMLCanvasElement|OffscreenCanvas} canvas - Target image canvas
  * @param {Object} [options] - Configuration settings
  * @param {number} [options.strength=5] - Magnitude of the perturbation noise (1-10)
- * @returns {Promise<HTMLCanvasElement>} Cloaked output canvas
+ * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Cloaked output canvas
  */
 export async function cloakImage(canvas, options = {}) {
   const { strength = 5 } = options;
 
   try {
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      throw new TypeError('Input must be an HTMLCanvasElement');
+    if (!canvas) {
+      throw new TypeError('Canvas parameter is required');
     }
 
     console.log(`[AICloak] Injecting adversarial cloak (intensity: ${strength})...`);
