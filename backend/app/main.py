@@ -1,14 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from .database.connection import engine, Base
 from .api import health, assets, dashboard, incidents, settings, scan, protect, reports
+import os
 
 load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SafeLens Backend", version="1.0.0")
+
+# Ensure storage directories exist
+os.makedirs("app/storage/uploads", exist_ok=True)
+os.makedirs("app/storage/thumbnails", exist_ok=True)
+os.makedirs("app/storage/reports", exist_ok=True)
+
+app.mount("/storage", StaticFiles(directory="app/storage"), name="storage")
 
 app.add_middleware(
     CORSMiddleware,

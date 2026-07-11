@@ -1,58 +1,87 @@
 /**
- * SafeLens Extension Communication Bridge Client
+ * SafeLens Extension Communication Bridge Client (Integrated Version)
  * 
  * Responsibility:
  * - Serves as the single gateway interface for all external communications.
- * - Handles messaging protocols to:
- *   1. Native Messaging Host (bridge.py) for local filesystem audits.
- *   2. FastAPI backend endpoints for dashboard syncs.
- * - Manages status check queries, incident reports, and settings synchronization.
- * - Implements clean error models and mock fallbacks when interfaces are offline.
- * 
- * Interacts with:
- * - extension/src/background/serviceWorker.js (Sends metrics logs to sync dashboard)
- */
-
-/**
- * @typedef {Object} IncidentPayload
- * @property {string} incidentId - Unique UUID for the incident
- * @property {string} fileName - File name containing PII
- * @property {number} fileSize - File size in bytes
- * @property {string} riskLevel - Rated risk level
- * @property {string} status - Resolution status ('protected' | 'bypassed' | 'cancelled')
- * @property {Object[]} detections - Extracted threat details
- * @property {number} timestamp - Trigger millisecond timestamp
+ * - Communicates with the FastAPI backend (http://localhost:8000) for storage, alert, and settings sync.
+ * - Implements a robust fetch wrapper with retries for transient network/server errors.
+ * - Provides graceful fallbacks when the backend is offline or unreachable.
  */
 
 class BridgeClient {
   constructor() {
-    this.nativePort = null;
-    this.isConnected = false;
+    this.baseUrl = 'http://localhost:8000';
   }
 
   /**
-   * Diagnostic health check evaluating connectivity to the backend FastAPI / native host.
+   * Helper to perform fetch requests with automatic retries for transient network/5xx failures.
+   */
+  async fetchWithRetry(url, options = {}, retries = 3, delay = 1000) {
+    let lastError = null;
+    let lastResponse = null;
+
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok) {
+          return response;
+        }
+        lastResponse = response;
+        // Retry for transient 5xx server errors, do not retry 4xx errors
+        if (response.status >= 500 && response.status < 600) {
+          console.warn(`[BridgeClient] Transient server error ${response.status}. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+        } else {
+          return response;
+        }
+      } catch (error) {
+        lastError = error;
+        console.warn(`[BridgeClient] Network/connection error: ${error.message}. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+      }
+      if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+    return lastResponse;
+  }
+
+  /**
+   * Diagnostic health check evaluating connectivity to the backend FastAPI server.
    * 
    * @returns {Promise<{ success: boolean, status: string, version: string }>} Diagnostic report
    */
   async checkHealth() {
     console.log('[BridgeClient] Querying service connectivity health...');
-    
-    // Simulate lightweight API ping response
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
+    try {
+      const response = await this.fetchWithRetry(`${this.baseUrl}/api/health`, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      if (result.success) {
+        return {
           success: true,
-          status: 'healthy',
-          version: '1.0.0',
-          provider: 'Mock / Future FastAPI Hook'
-        });
-      }, 100);
-    });
+          status: result.data.status || 'healthy',
+          version: result.data.version || '1.0.0'
+        };
+      }
+      throw new Error(result.message || 'Malformed health response');
+    } catch (error) {
+      console.warn('[BridgeClient] Health check failed, operating in offline fallback mode:', error.message);
+      return {
+        success: false,
+        status: 'offline',
+        version: '0.0.0'
+      };
+    }
   }
 
   /**
    * Transmits scan details and metadata logs to populate the central dashboard.
+   * Note: The file itself is uploaded to /api/protect during interception.
    * 
    * @param {Object} scanReport - Completed scan result metrics
    * @returns {Promise<{ success: boolean, syncId: string }>} Sync confirmation details
@@ -61,40 +90,58 @@ class BridgeClient {
     if (!scanReport) {
       throw new Error('Scan report payload is required');
     }
-
     console.log('[BridgeClient] Syncing scan report to FastAPI backend dashboard:', scanReport.metadata.name);
-
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          syncId: `sync_${Math.random().toString(36).substr(2, 9)}`
-        });
-      }, 150);
-    });
+    // Since the file upload handles registration, this serves as a light validation ping.
+    const health = await this.checkHealth();
+    return {
+      success: health.success,
+      syncId: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+    };
   }
 
   /**
-   * Triggers an incident alert notification when PII is intercepted on inputs.
+   * Triggers an incident alert notification on the backend when PII is intercepted.
    * 
-   * @param {IncidentPayload} incident - Detailed incident parameters
-   * @returns {Promise<{ success: boolean, alertDispatched: boolean }>} Confirmation report
+   * @param {Object} incident - Detailed incident parameters
+   * @returns {Promise<{ success: boolean, incidentId?: number }>} Confirmation report with backend incident ID
    */
   async sendIncidentNotification(incident) {
     if (!incident) {
       throw new Error('Incident payload is required');
     }
 
-    console.warn(`[BridgeClient] Dispatching PRIVACY INCIDENT ALERT: [${incident.riskLevel.toUpperCase()}] on file ${incident.fileName}`);
+    console.warn(`[BridgeClient] Dispatching PRIVACY INCIDENT ALERT to backend on asset ID: ${incident.assetId}`);
 
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
+    try {
+      const response = await this.fetchWithRetry(`${this.baseUrl}/api/incidents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_id: incident.assetId,
+          matched_url: incident.matchedUrl,
+          match_confidence: incident.matchConfidence,
+          severity: incident.severity || 'Normal',
+          status: incident.status || 'Open'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        console.log('[BridgeClient] Backend incident alert logged successfully. ID:', result.data.incident_id);
+        return {
           success: true,
-          alertDispatched: true
-        });
-      }, 200);
-    });
+          incidentId: result.data.incident_id
+        };
+      }
+      throw new Error(result.message || 'Failed to create backend incident alert');
+    } catch (error) {
+      console.error('[BridgeClient] Failed to dispatch incident alert:', error.message);
+      return { success: false };
+    }
   }
 
   /**
@@ -110,36 +157,30 @@ class BridgeClient {
 
     console.log('[BridgeClient] Synchronizing Settings preferences with server profile...');
 
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 100);
-    });
-  }
+    const similarityMap = { high: 90, medium: 70, low: 50 };
 
-  /**
-   * (Future Placeholder) Establishes runtime connection to the Chrome Native Messaging Host.
-   */
-  initializeNativePort() {
     try {
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.connectNative) {
-        console.log('[BridgeClient] Initializing Native Messaging Host port connection...');
-        this.nativePort = chrome.runtime.connectNative('safelens.bridge');
-        
-        this.nativePort.onMessage.addListener((msg) => {
-          console.log('[BridgeClient] Message received from Native Host:', msg);
-        });
+      const response = await this.fetchWithRetry(`${this.baseUrl}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auto_blur: settings.blurMode === 'blur',
+          watermark_enabled: settings.watermarkEnabled === true,
+          ai_cloak_enabled: settings.aiCloakEnabled === true,
+          notifications: settings.protectionEnabled === true,
+          similarity_threshold: similarityMap[settings.riskLevelThreshold] || 70
+        })
+      });
 
-        this.nativePort.onDisconnect.addListener(() => {
-          console.warn('[BridgeClient] Native Host port connection disconnected.');
-          this.nativePort = null;
-          this.isConnected = false;
-        });
-
-        this.isConnected = true;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
-    } catch (e) {
-      console.warn('[BridgeClient] Native messaging initialization skipped (unsupported context).', e);
+
+      const result = await response.json();
+      return { success: result.success === true };
+    } catch (error) {
+      console.error('[BridgeClient] Central settings synchronization failed:', error.message);
+      return { success: false };
     }
   }
 }

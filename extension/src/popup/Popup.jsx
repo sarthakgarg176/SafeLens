@@ -46,6 +46,22 @@ export default function Popup() {
           const currentStats = calculateStats(scanHistory);
           setStats(currentStats);
         }
+
+        // Retrieve real-time backend dashboard stats if available
+        try {
+          const dashboardRes = await fetch('http://localhost:8000/api/dashboard');
+          if (dashboardRes.ok) {
+            const result = await dashboardRes.json();
+            if (result.success && result.data) {
+              setStats({
+                totalScanned: result.data.total_assets,
+                secured: result.data.protected_assets
+              });
+            }
+          }
+        } catch (dashboardErr) {
+          console.warn('[Popup] Central dashboard offline, displaying locally cached stats:', dashboardErr.message);
+        }
       } catch (err) {
         console.warn('[Popup] Failed to load local extension details:', err);
       }

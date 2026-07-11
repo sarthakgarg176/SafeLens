@@ -54,20 +54,36 @@ export function canvasToFile(canvas, originalName, mimeType) {
       return reject(new TypeError('Canvas parameter is required'));
     }
 
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        return reject(new Error('Failed to extract binary blob from canvas'));
+    const securedName = originalName.replace(/(\.[\w\d]+)$/, '_protected$1');
+
+    if (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) {
+      canvas.convertToBlob({ type: mimeType })
+        .then((blob) => {
+          if (!blob) {
+            return reject(new Error('Failed to extract binary blob from offscreen canvas'));
+          }
+          const file = new File([blob], securedName, { 
+            type: mimeType, 
+            lastModified: Date.now() 
+          });
+          resolve(file);
+        })
+        .catch(reject);
+    } else {
+      if (typeof canvas.toBlob !== 'function') {
+        return reject(new TypeError('Canvas does not support toBlob operations'));
       }
-      
-      // Append a secure tag to the filename
-      const securedName = originalName.replace(/(\.[\w\d]+)$/, '_protected$1');
-      const file = new File([blob], securedName, { 
-        type: mimeType, 
-        lastModified: Date.now() 
-      });
-      
-      resolve(file);
-    }, mimeType);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          return reject(new Error('Failed to extract binary blob from canvas'));
+        }
+        const file = new File([blob], securedName, { 
+          type: mimeType, 
+          lastModified: Date.now() 
+        });
+        resolve(file);
+      }, mimeType);
+    }
   });
 }
 
@@ -92,6 +108,7 @@ export function canvasToFile(canvas, originalName, mimeType) {
  */
 export async function protectImagePipeline(file, settings = {}) {
   console.log(`[ProtectService] Initiating final protection pipeline for: ${file.name}`);
+  const startTime = Date.now();
 
   try {
     // 1. Convert original File to Canvas buffer
@@ -117,6 +134,7 @@ export async function protectImagePipeline(file, settings = {}) {
       console.log('[ProtectService] Document evaluated as low risk. Skipping edits.');
       return {
         success: true,
+        originalFile: file,
         protectedFile: file, // Return original file unmodified
         phash,
         whash,
@@ -126,7 +144,11 @@ export async function protectImagePipeline(file, settings = {}) {
           type: file.type
         },
         detections: [],
-        risk: scanResult.riskLevel
+        risk: scanResult.riskLevel,
+        protectionSummary: {
+          processingTime: Date.now() - startTime,
+          redacted: false
+        }
       };
     }
 
@@ -152,6 +174,7 @@ export async function protectImagePipeline(file, settings = {}) {
 
     return {
       success: true,
+      originalFile: file,
       protectedFile,
       phash,
       whash,
@@ -161,13 +184,18 @@ export async function protectImagePipeline(file, settings = {}) {
         type: file.type
       },
       detections: scanResult.detections,
-      risk: scanResult.riskLevel
+      risk: scanResult.riskLevel,
+      protectionSummary: {
+        processingTime: Date.now() - startTime,
+        redacted: true
+      }
     };
 
   } catch (error) {
     console.error('[ProtectService] Critical pipeline crash:', error);
     return {
       success: false,
+      originalFile: file,
       protectedFile: file, // Fallback to original file on failure
       phash: '',
       whash: '',
@@ -178,6 +206,10 @@ export async function protectImagePipeline(file, settings = {}) {
       },
       detections: [],
       risk: 'low',
+      protectionSummary: {
+        processingTime: Date.now() - startTime,
+        redacted: false
+      },
       error: error instanceof Error ? error.message : 'Unknown protection pipeline failure'
     };
   }

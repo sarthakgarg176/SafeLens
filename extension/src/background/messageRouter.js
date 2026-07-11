@@ -28,9 +28,9 @@ import { bridgeClient } from '../communication/bridgeClient.js';
  * @property {string} [error] - The error message on failure
  */
 
-/**
- * Registry of message handlers
- */
+// Mutex lock to serialize LOG_SCAN operations and prevent storage race conditions
+let logScanLock = Promise.resolve();
+
 const handlers = {
   /**
    * Preprocesses intercepted image files using local OpenCV.js (WASM) inside the Service Worker.
@@ -91,7 +91,26 @@ const handlers = {
     };
 
     const result = await protectImagePipeline(mockFile, settings);
-    return result;
+    
+    let outBuffer;
+    if (result.protectedFile && typeof result.protectedFile.arrayBuffer === 'function') {
+      outBuffer = await result.protectedFile.arrayBuffer();
+    } else {
+      outBuffer = arrayBuffer;
+    }
+
+    return {
+      success: result.success !== false,
+      arrayBuffer: outBuffer,
+      name: (result.protectedFile && result.protectedFile.name) || name,
+      type: (result.protectedFile && result.protectedFile.type) || type,
+      phash: result.phash || '',
+      whash: result.whash || '',
+      detections: result.detections || [],
+      risk: result.risk || 'low',
+      protectionSummary: result.protectionSummary || { processingTime: 0, redacted: false },
+      error: result.error
+    };
   },
 
   /**
@@ -124,34 +143,69 @@ const handlers = {
   /**
    * Log an intercepted upload scan result to session storage.
    */
-  LOG_SCAN: async (payload) => {
+  LOG_SCAN: async (payload, sender) => {
     if (!payload || !payload.scanId) {
       throw new Error('Invalid scan log payload');
     }
-    const { scans = [] } = await chrome.storage.local.get('scans');
-    const updatedScans = [payload, ...scans].slice(0, 100); // Keep last 100 scans
-    await chrome.storage.local.set({ scans: updatedScans });
 
-    // Sync metrics and dispatch alerts to bridge channels
+    let release;
+    const nextLock = new Promise((resolve) => {
+      logScanLock.then(() => resolve());
+    });
+    logScanLock = new Promise((resolve) => {
+      release = resolve;
+    });
+
+    await nextLock;
+
     try {
-      await bridgeClient.syncScanResult({
-        metadata: { name: payload.fileName, size: payload.size, type: 'image/png' },
-        ...payload
-      });
+      // 1. Fetch current scans from storage
+      const { scans = [] } = await chrome.storage.local.get('scans');
+      
+      // 2. Add to log immediately so it's in storage early
+      const updatedScans = [payload, ...scans].slice(0, 100);
+      await chrome.storage.local.set({ scans: updatedScans });
 
-      if (payload.riskLevel !== 'low') {
-        await bridgeClient.sendIncidentNotification({
-          incidentId: payload.scanId,
-          fileName: payload.fileName,
-          fileSize: payload.size,
-          riskLevel: payload.riskLevel,
-          status: payload.status,
-          detections: payload.detections,
-          timestamp: Date.now()
+      // 3. Sync metrics and dispatch alerts to bridge channels
+      try {
+        await bridgeClient.syncScanResult({
+          metadata: { name: payload.fileName, size: payload.size, type: 'image/png' },
+          ...payload
         });
+
+        if (payload.riskLevel !== 'low' && payload.assetId) {
+          const matchedUrl = sender ? (sender.url || sender.origin || 'unknown') : 'unknown';
+          const incidentResponse = await bridgeClient.sendIncidentNotification({
+            assetId: payload.assetId,
+            matchedUrl: matchedUrl,
+            matchConfidence: payload.confidence,
+            severity: payload.riskLevel === 'critical' ? 'Serious' : 'Normal',
+            status: 'Open'
+          });
+
+          if (incidentResponse && incidentResponse.success && incidentResponse.incidentId) {
+            payload.incidentId = incidentResponse.incidentId;
+            
+            // Re-fetch current scans from storage to avoid overwriting changes from other serialized runs
+            const { scans: currentScans = [] } = await chrome.storage.local.get('scans');
+            
+            // Update the specific scan element in the array
+            const finalScans = currentScans.map(s => {
+              if (s.scanId === payload.scanId) {
+                return { ...s, incidentId: incidentResponse.incidentId };
+              }
+              return s;
+            });
+            
+            await chrome.storage.local.set({ scans: finalScans });
+            console.log('[MessageRouter] Linked local scan record with backend incident ID:', incidentResponse.incidentId);
+          }
+        }
+      } catch (e) {
+        console.warn('[MessageRouter] Failed to sync scan metadata with BridgeClient:', e);
       }
-    } catch (e) {
-      console.warn('[MessageRouter] Failed to sync scan metadata with BridgeClient:', e);
+    } finally {
+      release();
     }
 
     return { success: true };

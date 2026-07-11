@@ -1,5 +1,4 @@
 import { showDecisionPopup } from './decisionPopup.js';
-import { protectImagePipeline } from '../services/protectService.js';
 
 /**
  * Upload Interceptor for SafeLens Content Script
@@ -86,7 +85,76 @@ export async function interceptUpload(files, metadata, targetElement, onApproval
  */
 async function runPipeline(files, settings) {
   const results = await Promise.all(
-    files.map(file => protectImagePipeline(file, settings))
+    files.map(async (file) => {
+      try {
+        console.log('[UploadInterceptor] Serializing and delegating file to SW:', file.name);
+        const arrayBuffer = await file.arrayBuffer();
+
+        const response = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({
+            type: 'RUN_PROTECT_PIPELINE',
+            payload: {
+              arrayBuffer: arrayBuffer,
+              name: file.name,
+              type: file.type,
+              settings: settings
+            }
+          }, (res) => {
+            if (chrome.runtime.lastError) {
+              console.error('[UploadInterceptor] SW message error:', chrome.runtime.lastError.message);
+              resolve({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              resolve(res || { success: false, error: 'No response from Service Worker' });
+            }
+          });
+        });
+
+        if (response && response.success && response.data) {
+          const resData = response.data;
+          const blob = new Blob([resData.arrayBuffer], { type: resData.type });
+          const protectedFile = new File([blob], resData.name, {
+            type: resData.type,
+            lastModified: Date.now()
+          });
+
+          return {
+            success: true,
+            originalFile: file,
+            protectedFile: protectedFile,
+            phash: resData.phash,
+            whash: resData.whash,
+            metadata: {
+              name: file.name,
+              size: file.size,
+              type: file.type
+            },
+            detections: resData.detections,
+            risk: resData.risk,
+            protectionSummary: resData.protectionSummary
+          };
+        } else {
+          throw new Error((response && response.error) || 'Failed protection pipeline execution');
+        }
+      } catch (err) {
+        console.error('[UploadInterceptor] Pipeline delegation failed. Falling back to original:', file.name, err);
+        return {
+          success: false,
+          originalFile: file,
+          protectedFile: file,
+          phash: '',
+          whash: '',
+          metadata: {
+            name: file.name,
+            size: file.size,
+            type: file.type
+          },
+          detections: [],
+          risk: 'low',
+          protectionSummary: { processingTime: 0, redacted: false },
+          error: err.message
+        };
+      }
+    })
   );
 
   // Log scan results to populate local statistics history in parallel
@@ -94,6 +162,32 @@ async function runPipeline(files, settings) {
     results.map(async (res) => {
       if (!res.success) return;
 
+      // 1. Upload protected/original file to backend /api/protect
+      let assetId = null;
+      try {
+        const formData = new FormData();
+        formData.append('image', res.protectedFile);
+        formData.append('blur_enabled', (settings.blurMode === 'blur' && res.protectionSummary.redacted) ? 'true' : 'false');
+        formData.append('ai_cloak', (settings.aiCloakEnabled && res.protectionSummary.redacted) ? 'true' : 'false');
+        formData.append('watermark', (settings.watermarkEnabled && res.protectionSummary.redacted) ? 'true' : 'false');
+
+        const uploadResponse = await fetch('http://localhost:8000/api/protect', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          if (uploadResult.success && uploadResult.data) {
+            assetId = uploadResult.data.asset_id;
+            console.log('[UploadInterceptor] Registered asset on backend. ID:', assetId);
+          }
+        }
+      } catch (err) {
+        console.warn('[UploadInterceptor] Backend asset registration bypassed (server offline):', err.message);
+      }
+
+      // 2. Dispatch LOG_SCAN message to background Service Worker
       try {
         const maxConfidence = res.detections.reduce((max, d) => Math.max(max, d.fusedConfidence || 0), 0) || 0.8;
         
@@ -108,7 +202,8 @@ async function runPipeline(files, settings) {
             piiCount: res.detections.length,
             processingTime: res.protectionSummary.processingTime,
             status: res.protectionSummary.redacted ? 'protected' : 'passed',
-            detections: res.detections
+            detections: res.detections,
+            assetId: assetId // Link the backend asset
           }
         });
       } catch (e) {

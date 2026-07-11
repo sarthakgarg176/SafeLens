@@ -6,27 +6,43 @@ vi.mock('../src/content/decisionPopup.js', () => ({
   showDecisionPopup: vi.fn(() => Promise.resolve('protect'))
 }));
 
-// Mock protectService
-vi.mock('../src/services/protectService.js', () => ({
-  protectImagePipeline: vi.fn((file, settings) => Promise.resolve({
-    success: true,
-    originalFile: file,
-    protectedFile: { name: 'secured.png', size: 500, type: 'image/png' },
-    phash: '1234567890abcdef',
-    whash: 'abcdef1234567890',
-    risk: 'high',
-    detections: [{ type: 'EMAIL', fusedConfidence: 0.95 }],
-    protectionSummary: { processingTime: 120, redacted: true }
-  }))
-}));
-
 describe('Upload Interceptor Context Controller', () => {
-  const mockFile = { name: 'upload.png', size: 1000, type: 'image/png' };
+  const mockFile = { 
+    name: 'upload.png', 
+    size: 1000, 
+    type: 'image/png',
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(1000))
+  };
   const mockFiles = [mockFile];
   const mockMetadata = [{ name: 'upload.png', size: 1000, type: 'image/png' }];
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default mock implementation for chrome.runtime.sendMessage to simulate SW execution
+    chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+      if (message.type === 'RUN_PROTECT_PIPELINE') {
+        const response = {
+          success: true,
+          data: {
+            arrayBuffer: new ArrayBuffer(500),
+            name: 'secured.png',
+            type: 'image/png',
+            phash: '1234567890abcdef',
+            whash: 'abcdef1234567890',
+            risk: 'high',
+            detections: [{ type: 'EMAIL', fusedConfidence: 0.95 }],
+            protectionSummary: { processingTime: 120, redacted: true }
+          }
+        };
+        if (callback) callback(response);
+        return Promise.resolve(response);
+      }
+      
+      const defaultResponse = { success: true };
+      if (callback) callback(defaultResponse);
+      return Promise.resolve(defaultResponse);
+    });
   });
 
   it('should immediately bypass protection and invoke callback with original files if shield is disabled', async () => {

@@ -9,8 +9,9 @@ You are a Chrome Extension Integration Engineer. Connect the upload interception
   - If Protection is OFF: Instantly resume the original file upload.
   - If Auto Protect is ON: Call the `protectImagePipeline` immediately on the file, then call `onApprovalCallback` with the protected output file.
   - If Auto Protect is OFF: Render the premium `decisionPopup` modal.
-    - **Protect**: Run `protectImagePipeline`, log results to stats, and upload the secured file.
-    - **Upload Anyway**: Skip protection and upload the original file.
+    - **Protect**: Run `protectImagePipeline` to secure the file locally, upload the protected file to `/api/protect` to get the `asset_id`, log results via `LOG_SCAN(asset_id)`, and trigger `POST /api/incidents` if PII was detected.
+    - **Upload Anyway**: Skip protection and upload the original file, checking if it should be registered on the backend dashboard.
     - **Cancel**: Close the modal and discard the upload event.
-- **Worker Message Passing**: Since File objects are not serializable across IPC, convert File targets to ArrayBuffers, send them to the Service Worker via `chrome.runtime.sendMessage`, run the CPU-intensive OpenCV and Tesseract modules, and return the modified ArrayBuffer along with pHash/wHash strings and detections metadata.
-- **Statistics Logging**: Save each protected or passed file transaction in local storage (`LOG_SCAN`) to update active dashboard charts.
+- **Worker Message Passing**: Since File objects are not serializable across IPC, convert File targets to ArrayBuffers, send them to the Service Worker via `chrome.runtime.sendMessage` with type `RUN_PROTECT_PIPELINE`, run the CPU-intensive OpenCV and Tesseract modules in the background Service Worker/Offscreen Document context, and return the modified ArrayBuffer to reconstruct the File object in the Content Script.
+- **Statistics Logging & Central Sync**: Save each protected or passed file transaction in local storage (`LOG_SCAN`) to update active dashboard charts, and sync settings/incidents with the FastAPI server.
+
