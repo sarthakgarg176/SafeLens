@@ -19,7 +19,7 @@ const SESSION_KEY = 'cloakai_session_token';
 
 function isAuthenticated() {
   const token = localStorage.getItem(SESSION_KEY);
-  return typeof token === 'string' && token.trim().length > 0;
+  return typeof token === 'string' && token.trim().length > 0 && token !== 'false';
 }
 
 /* ─── Lock document to dark mode permanently ────────────────────────────────── */
@@ -53,11 +53,17 @@ function PublicRoute({ children }) {
 /* ─────────────────────────────────────────────────────────────────────────────
    DashboardShell
    The persistent shell (Sidebar + Navbar + main content area) rendered for
-   every protected dashboard route.
+   every protected dashboard route. Checks token on layout render for airtight
+   security.
 ────────────────────────────────────────────────────────────────────────────── */
 function DashboardShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const toggleSidebar = () => setSidebarOpen((p) => !p);
+
+  // Airtight sanity check directly on every layout render
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-slate-100 overflow-x-hidden">

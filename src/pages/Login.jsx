@@ -47,6 +47,7 @@ function validateEmail(v) {
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
 export default function Login() {
   const navigate = useNavigate();
+  const Maps = navigate;
 
   /* Form state */
   const [email,       setEmail]       = useState('');
@@ -78,8 +79,8 @@ export default function Login() {
     if (email.trim() === DEMO_EMAIL && password === DEMO_PASSWORD) {
       setLoading(true);
       setTimeout(() => {
-        localStorage.setItem(SESSION_KEY, 'true');
-        navigate('/', { replace: true });
+        localStorage.setItem('cloakai_session_token', 'true');
+        Maps('/');
       }, 1000);
 
     } else {
