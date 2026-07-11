@@ -37,6 +37,7 @@ async function runBuild() {
         rollupOptions: {
           input: {
             popup: resolve(publicDir, 'popup.html'),
+            offscreen: resolve(publicDir, 'offscreen.html'),
           },
           output: {
             entryFileNames: 'assets/[name]-[hash].js',
@@ -48,7 +49,12 @@ async function runBuild() {
     });
 
     // 3. Build Background Service Worker
-    // Built in ES mode, but as a single library bundle to avoid chunk splitting.
+    // Built in ES module format. inlineDynamicImports collapses all dynamic import() calls
+    // into static inline code, producing a single self-contained file.
+    // This is REQUIRED because:
+    //   a) Chrome MV3 module service workers do not support dynamic import().
+    //   b) Code-splitting generates a separate chunk + an await import() call in the entry,
+    //      both of which cause "Status code: 3" registration failure.
     console.log('\n--- Building Background Service Worker ---');
     await build({
       root: extDir,
@@ -65,10 +71,12 @@ async function runBuild() {
           fileName: () => 'background/serviceWorker.js',
         },
         rollupOptions: {
-          external: [], // Force rollup to bundle all npm dependencies for Chrome Extensions compatibility
+          external: [], // Bundle all dependencies into the single output file
           output: {
             entryFileNames: 'background/serviceWorker.js',
-            chunkFileNames: 'background/[name]-[hash].js',
+            // inlineDynamicImports: prevents Rollup from code-splitting the SW into
+            // a chunk file that would require a dynamic import() at runtime.
+            inlineDynamicImports: true,
           },
         },
       },

@@ -1,21 +1,18 @@
-// Initialize Module settings for OpenCV WASM loading
-self.Module = {
-  onRuntimeInitialized: () => {
-    console.log('[ServiceWorker] OpenCV.js (WASM) initialized successfully.');
-  }
-};
-
-try {
-  importScripts('/opencv.js');
-} catch (err) {
-  console.error('[ServiceWorker] Failed to load OpenCV.js:', err);
-}
+/**
+ * SafeLens Background Service Worker (Manifest V3, ES Module)
+ *
+ * Responsibility:
+ * - Coordinates background tasks and extension lifetime.
+ * - Seeds default settings configuration on installation.
+ * - Routes runtime messages to the messageRouter.
+ *
+ * OpenCV Loading & Compliance:
+ * - OpenCV.js is run inside an Offscreen Document (complying with Manifest V3 security).
+ * - No eval(), importScripts(), or dynamic import() is present in the Service Worker.
+ */
 
 import { DEFAULT_SETTINGS } from '../config/defaults.js';
-
-// Dynamically import message router to prevent ESM hoisting race conditions where
-// messageRouter would be evaluated before self.Module/opencv is loaded into global scope.
-const { routeMessage } = await import('./messageRouter.js');
+import { routeMessage } from './messageRouter.js';
 
 /**
  * Handle Extension installation or updates
@@ -61,3 +58,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
   return true; // Keep the runtime communication channel open for asynchronous response
 });
+

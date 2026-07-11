@@ -164,6 +164,11 @@ const handlers = {
  * @returns {Promise<void>} Resolves when global cv object is loaded and parsed
  */
 async function waitForOpenCV() {
+  // If in Service Worker, delegation handles waiting, so bypass local check
+  if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
+    return;
+  }
+
   if (typeof cv !== 'undefined' && cv.matFromImageData) {
     return;
   }

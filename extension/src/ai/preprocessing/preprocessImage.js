@@ -21,8 +21,12 @@ import { applyThreshold } from './threshold.js';
  * - extension/src/services/scanService.js (Invokes this pipeline prior to OCR)
  */
 
+import { sendToOffscreen } from '../../background/offscreenManager.js';
+
 /**
  * Runs the complete OpenCV.js preprocessing pipeline.
+ * If running in the background Service Worker, this proxies the execution to the
+ * Offscreen Document to comply with Manifest V3 limitations (no eval, no importScripts).
  * If any individual filter stage fails, the pipeline logs a warning and moves to
  * the next filter step, ensuring the upload process remains active and stable.
  * 
@@ -36,6 +40,37 @@ import { applyThreshold } from './threshold.js';
  * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Preprocessed output canvas
  */
 export async function preprocessImage(imageSource, options = {}) {
+  // If in Service Worker, delegate to the Offscreen Document
+  if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
+    console.log('[Preprocessor] Running in Service Worker. Delegating OpenCV to Offscreen Document...');
+    try {
+      const ctx = imageSource.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, imageSource.width, imageSource.height);
+      
+      const result = await sendToOffscreen('PREPROCESS_IMAGE', {
+        width: imageSource.width,
+        height: imageSource.height,
+        data: imgData.data.buffer,
+        options
+      });
+
+      const outputCanvas = typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(result.width, result.height)
+        : document.createElement('canvas');
+      outputCanvas.width = result.width;
+      outputCanvas.height = result.height;
+
+      const outCtx = outputCanvas.getContext('2d');
+      const outImgData = new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
+      outCtx.putImageData(outImgData, 0, 0);
+
+      return outputCanvas;
+    } catch (error) {
+      console.error('[Preprocessor] Offscreen delegation failed. Returning original imageSource.', error);
+      return imageSource;
+    }
+  }
+
   const {
     enableDenoise = true,
     enableDeskew = true,

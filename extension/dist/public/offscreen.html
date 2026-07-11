@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SafeLens Offscreen Processor</title>
+    <!-- 
+      Load OpenCV.js synchronously via standard script tag.
+      Since this runs in an offscreen DOM context, it compiles and runs standard UMD
+      without violating CSP or needing eval() / importScripts() inside the service worker.
+    -->
+    <script src="/opencv.js"></script>
+    <script type="module" crossorigin src="/assets/offscreen-Di-sc5eg.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+  </head>
+  <body>
+  </body>
+</html>
