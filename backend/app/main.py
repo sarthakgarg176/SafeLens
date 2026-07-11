@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from .database.connection import engine, Base
-from .api import health, assets, dashboard, incidents, settings, scan, protect, reports
+from .api import health, assets, dashboard, incidents, settings, scan, protect, reports, scans
 
 load_dotenv()
 
@@ -28,3 +28,4 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(scan.router, prefix="/api")
 app.include_router(protect.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(scans.router, prefix="/api")
