@@ -20,6 +20,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {
+        "success": True,
+        "message": "SafeLens Backend API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
 app.include_router(health.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
