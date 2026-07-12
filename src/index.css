@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  /* ==========================================================================
+     System Typography
+     ========================================================================== */
+  --font-sans: "Outfit", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Outfit", "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* ==========================================================================
+     Cyber Brand Accents & Semantic Risk Tokens
+     ========================================================================== */
+  --color-brand-primary: #7c3aed;
+  --color-brand-secondary: #6366f1;
+
+  --color-risk-high: #ef4444;
+  --color-risk-medium: #f59e0b;
+  --color-risk-low: #3b82f6;
+  --color-risk-safe: #10b981;
+
+  /* ==========================================================================
+     Dynamic Tailwind v4 Utility Variables
+     ========================================================================== */
+  --color-bg-app: var(--bg-app);
+  --color-surface: var(--surface);
+  --color-border: var(--border-color);
+  --color-text-main: var(--text-main);
+}
+
+/* ==========================================================================
+   Global Base Resets & Light Mode (Default Theme Tokens)
+   ========================================================================== */
+:root {
+  --bg-app: #f8fafc;
+  --surface: rgba(255, 255, 255, 0.85);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --text-main: #334155;
+
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 145%;
+  letter-spacing: 0.01em;
+  background-color: var(--color-bg-app);
+  color: var(--color-text-main);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    font-size: 16px;
+  }
+}
+
+/* ==========================================================================
+   Explicit Enterprise Dark Mode Tokens (Triggered via .dark on <html>)
+   ========================================================================== */
+.dark {
+  --bg-app: #0a0b10;
+  --surface: rgba(15, 17, 26, 0.65);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-main: #f3f4f6;
+
+  background-color: var(--color-bg-app);
+  color: var(--color-text-main);
+}
+
+/* ==========================================================================
+   Custom Cybersecurity UI Helper Classes
+   ========================================================================== */
+.glass-card {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.neon-glow-purple {
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.15);
+}
+
+/* Scrollbar Tweaks for Dense Telemetry Views */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.25);
+  border-radius: 9999px;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.15);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.4);
+}

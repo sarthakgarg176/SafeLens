@@ -1,35 +1,13 @@
 import { showDecisionPopup } from './decisionPopup.js';
 
 /**
- * Upload Interceptor for SafeLens Content Script
- * 
- * Responsibility:
- * - Intercepts file uploads on target web pages.
- * - Inspects active settings status to check if protection is enabled and if Auto Protect is ON/OFF.
- * - Displays decisionPopup UI dialog if Auto Protect is OFF.
- * - Executes the local protection pipeline (OpenCV preprocessing, Tesseract OCR, Rules, redacting/masking, hashes, cloaking, watermarking).
- * - Logs scan results to storage via messaging to sync stats.
- * - Resumes the browser upload event with approved or secured File objects.
- * 
- * Interacts with:
- * - extension/src/content/uploadDetector.js (Receives intercepted files)
- * - extension/src/content/decisionPopup.js (Prompts user actions)
- * - extension/src/services/protectService.js (Runs the protection pipeline)
+ * Upload Interceptor for SafeLens Content Script (Fixed Context Isolation Version)
  */
 
-/**
- * Intercepts the upload list, checks settings, and coordinates the protection pipeline.
- * 
- * @param {File[]} files - Selected image files
- * @param {Object[]} metadata - Metadata extracted by the detector
- * @param {HTMLElement} targetElement - Original DOM target element of the upload
- * @param {Function} onApprovalCallback - Callback to resume upload with approved file list
- */
 export async function interceptUpload(files, metadata, targetElement, onApprovalCallback) {
   console.log('[UploadInterceptor] Intercepting upload event for files:', metadata.map(m => m.name));
 
   try {
-    // 1. Retrieve current settings from storage
     let settings = { protectionEnabled: true, autoProtect: false };
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       const data = await chrome.storage.local.get('settings');
@@ -38,7 +16,6 @@ export async function interceptUpload(files, metadata, targetElement, onApproval
       }
     }
 
-    // 2. If the protection shield is globally suspended, let files pass through unmodified
     if (settings.protectionEnabled === false) {
       console.log('[UploadInterceptor] Shield is suspended. Resuming original upload.');
       return onApprovalCallback(files);
@@ -47,13 +24,11 @@ export async function interceptUpload(files, metadata, targetElement, onApproval
     const autoProtect = settings.autoProtect === true || settings.autoRedact === true;
 
     if (autoProtect) {
-      // Flow A: Auto Protect is ON -> immediately run pipeline and continue upload
       console.log('[UploadInterceptor] Auto Protect is ON. Running protection pipeline immediately...');
       const results = await runPipeline(files, settings);
       const protectedFiles = results.map(r => r.protectedFile);
       onApprovalCallback(protectedFiles);
     } else {
-      // Flow B: Auto Protect is OFF -> show choice popup
       const choice = await showDecisionPopup(files, metadata);
       
       if (choice === 'protect') {
@@ -71,32 +46,16 @@ export async function interceptUpload(files, metadata, targetElement, onApproval
 
   } catch (error) {
     console.error('[UploadInterceptor] Interception pipeline failure:', error);
-    // Graceful fallback: upload original files on critical failure
     onApprovalCallback(files);
   }
 }
 
-/**
- * Runs the full protection pipeline on a list of files and logs stats back to storage.
- * 
- * @param {File[]} files - Original files to protect
- * @param {Object} settings - Pipeline configuration options
- * @returns {Promise<Object[]>} Pipeline result objects
- */
 async function runPipeline(files, settings) {
   const results = await Promise.all(
     files.map(async (file) => {
       try {
         console.log('[UploadInterceptor] Serializing and delegating file to SW:', file.name);
         const arrayBuffer = await file.arrayBuffer();
-
-        // 1. Logs added before PING
-        console.log('====================================');
-        console.log('A: Before PING');
-        console.log('chrome =', chrome);
-        console.log('chrome.runtime =', chrome?.runtime);
-        console.log('typeof sendMessage =', typeof chrome?.runtime?.sendMessage);
-        console.log('====================================');
 
         console.log('[UploadInterceptor] Sending PING to wake Service Worker...');
         await new Promise((resolve) => {
@@ -110,18 +69,8 @@ async function runPipeline(files, settings) {
           });
         });
 
-        console.log('[UploadInterceptor] PING complete. typeof chrome.storage.session:', typeof chrome.storage.session);
-
         const storageKey = 'pending_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         await chrome.storage.session.set({ [storageKey]: arrayBuffer });
-
-        // 2. Logs added before RUN_PROTECT_PIPELINE
-        console.log('====================================');
-        console.log('B: Before RUN_PROTECT_PIPELINE');
-        console.log('chrome =', chrome);
-        console.log('chrome.runtime =', chrome?.runtime);
-        console.log('typeof sendMessage =', typeof chrome?.runtime?.sendMessage);
-        console.log('====================================');
 
         const response = await new Promise((resolve) => {
           chrome.runtime.sendMessage({
@@ -150,7 +99,7 @@ async function runPipeline(files, settings) {
             outBuffer = storageData[resData.storageKey];
             await chrome.storage.session.remove(resData.storageKey);
           } else {
-            outBuffer = resData.arrayBuffer || arrayBuffer; // fallback
+            outBuffer = resData.arrayBuffer || arrayBuffer;
           }
 
           const blob = new Blob([outBuffer], { type: resData.type });
@@ -185,11 +134,7 @@ async function runPipeline(files, settings) {
           protectedFile: file,
           phash: '',
           whash: '',
-          metadata: {
-            name: file.name,
-            size: file.size,
-            type: file.type
-          },
+          metadata: { name: file.name, size: file.size, type: file.type },
           detections: [],
           risk: 'low',
           protectionSummary: { processingTime: 0, redacted: false },
@@ -199,45 +144,50 @@ async function runPipeline(files, settings) {
     })
   );
 
-  // Log scan results to populate local statistics history in parallel
+  // Defer network operations entirely to the Background Service Worker context
   await Promise.all(
     results.map(async (res) => {
       if (!res.success) return;
 
-      // 1. Upload protected/original file to backend /api/protect
       let assetId = null;
       try {
-        const formData = new FormData();
-        formData.append('image', res.protectedFile);
-        formData.append('blur_enabled', (settings.blurMode === 'blur' && res.protectionSummary.redacted) ? 'true' : 'false');
-        formData.append('ai_cloak', (settings.aiCloakEnabled && res.protectionSummary.redacted) ? 'true' : 'false');
-        formData.append('watermark', (settings.watermarkEnabled && res.protectionSummary.redacted) ? 'true' : 'false');
-
-        const uploadResponse = await fetch('http://localhost:8000/api/protect', {
-          method: 'POST',
-          body: formData
-        });
+        console.log('[UploadInterceptor] Delegating asset registration to SW to bypass host CSP restrictions...');
         
-        if (uploadResponse.ok) {
-          const uploadResult = await uploadResponse.json();
-          if (uploadResult.success && uploadResult.data) {
-            assetId = uploadResult.data.asset_id;
-            console.log('[UploadInterceptor] Registered asset on backend. ID:', assetId);
-          }
+        // Render target setup requires transfer via session storage or short array conversion
+        const protectedBuffer = await res.protectedFile.arrayBuffer();
+        const uploadStorageKey = 'upload_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        await chrome.storage.session.set({ [uploadStorageKey]: protectedBuffer });
+
+        // Request background routing channel to safely push to production Render endpoint
+        const uploadResponse = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({
+            type: 'REGISTER_BACKEND_ASSET',
+            payload: {
+              storageKey: uploadStorageKey,
+              name: res.protectedFile.name,
+              type: res.protectedFile.type,
+              blur_enabled: (settings.blurMode === 'blur' && res.protectionSummary.redacted) ? 'true' : 'false',
+              ai_cloak: (settings.aiCloakEnabled && res.protectionSummary.redacted) ? 'true' : 'false',
+              watermark: (settings.watermarkEnabled && res.protectionSummary.redacted) ? 'true' : 'false'
+            }
+          }, (resObj) => {
+            if (chrome.runtime.lastError) {
+              resolve({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              resolve(resObj || { success: false });
+            }
+          });
+        });
+
+        if (uploadResponse && uploadResponse.success && uploadResponse.data) {
+          assetId = uploadResponse.data.assetId;
+          console.log('[UploadInterceptor] Safely registered asset via Background Worker. ID:', assetId);
         }
       } catch (err) {
-        console.warn('[UploadInterceptor] Backend asset registration bypassed (server offline):', err.message);
+        console.warn('[UploadInterceptor] Background asset registration messaging failed:', err.message);
       }
 
-      // 3. Logs added before LOG_SCAN
-      console.log('====================================');
-      console.log('C: Before LOG_SCAN');
-      console.log('chrome =', chrome);
-      console.log('chrome.runtime =', chrome?.runtime);
-      console.log('typeof sendMessage =', typeof chrome?.runtime?.sendMessage);
-      console.log('====================================');
-
-      // 2. Dispatch LOG_SCAN message to background Service Worker
+      // Dispatch scan logs metrics safely to local storage
       try {
         const maxConfidence = res.detections.reduce((max, d) => Math.max(max, d.fusedConfidence || 0), 0) || 0.8;
         
@@ -253,11 +203,11 @@ async function runPipeline(files, settings) {
             processingTime: res.protectionSummary.processingTime,
             status: res.protectionSummary.redacted ? 'protected' : 'passed',
             detections: res.detections,
-            assetId: assetId // Link the backend asset
+            assetId: assetId
           }
         });
       } catch (e) {
-        console.warn('[UploadInterceptor] Failed to log scan result:', e);
+        console.warn('[UploadInterceptor] Failed to dispatch scan log metrics:', e);
       }
     })
   );

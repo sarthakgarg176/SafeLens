@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "SafeLens Privacy Shield AI",
+  "version": "1.0.0",
+  "description": "Enterprise security extension for Privacy Shield AI client vector scanning and PII redaction.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.remove.bg/*",
+    "https://safelens-zttx.onrender.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

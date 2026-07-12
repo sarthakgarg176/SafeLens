@@ -9,6 +9,10 @@
     "scripting",
     "offscreen"
   ],
+  "host_permissions": [
+    "https://www.remove.bg/*",
+    "https://safelens-zttx.onrender.com/*"
+  ],
   "background": {
     "service_worker": "background/serviceWorker.js",
     "type": "module"

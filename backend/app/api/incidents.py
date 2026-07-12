@@ -6,12 +6,13 @@ from ..database.models import Alert, Action, Asset
 from datetime import datetime, timezone
 from pydantic import BaseModel
 
-router = APIRouter()
+# Hamne explicitly prefix specify kar diya taaki main.py ke sath koi confusion na ho
+router = APIRouter(prefix="/incidents", tags=["incidents"])
 
 class DecisionRequest(BaseModel):
     decision: str
 
-@router.get("/incidents")
+@router.get("")
 def get_incidents(db: Session = Depends(get_db)):
     alerts = db.query(Alert).all()
     return {
@@ -32,7 +33,7 @@ def get_incidents(db: Session = Depends(get_db)):
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-@router.get("/incidents/{incident_id}")
+@router.get("/{incident_id}")
 def get_incident(incident_id: int, db: Session = Depends(get_db)):
     alert = db.query(Alert).filter(Alert.id == incident_id).first()
     if not alert:
@@ -53,7 +54,7 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-@router.post("/incidents/{incident_id}/decision")
+@router.post("/{incident_id}/decision")
 def make_decision(incident_id: int, request: DecisionRequest, db: Session = Depends(get_db)):
     alert = db.query(Alert).filter(Alert.id == incident_id).first()
     if not alert:
@@ -87,14 +88,14 @@ class IncidentCreate(BaseModel):
     severity: str = "Normal"
     status: str = "Open"
 
-@router.post("/incidents")
+@router.post("")
 def create_incident(incident: IncidentCreate, db: Session = Depends(get_db)):
     # Check if the asset exists
     asset = db.query(Asset).filter(Asset.id == incident.asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
         
-    # Idempotency check: if an alert already exists for this asset, return the existing alert
+    # Idempotency check
     existing_alert = db.query(Alert).filter(Alert.asset_id == incident.asset_id).first()
     if existing_alert:
         return {
@@ -123,7 +124,6 @@ def create_incident(incident: IncidentCreate, db: Session = Depends(get_db)):
         db.refresh(new_alert)
     except IntegrityError:
         db.rollback()
-        # Retrieve the existing alert because of concurrent write race or retry
         existing_alert = db.query(Alert).filter(Alert.asset_id == incident.asset_id).first()
         if existing_alert:
             return {
