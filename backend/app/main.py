@@ -2,13 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
-from .database.connection import engine, Base
-<<<<<<< HEAD
-from .api import health, assets, dashboard, incidents, settings, scan, protect, reports, scans
-=======
-from .api import health, assets, dashboard, incidents, settings, scan, protect, reports
 import os
->>>>>>> origin/feature-sahil
+from .database.connection import engine, Base
+from .api import health, assets, dashboard, incidents, settings, scan, protect, reports, scans
 
 load_dotenv()
 

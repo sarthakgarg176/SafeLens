@@ -107,3 +107,28 @@ async def upload_scan(
             "whash": whash
         }
     }
+
+from ..database.ledger import SCAN_LEDGER
+
+class ExtensionScanPayload(BaseModel):
+    scan_id: str
+    document_context: str
+    risk_score: float
+    hits_count: int
+    recommendation: str
+    has_redacted_image: bool
+
+@router.post("/scans", status_code=201)
+async def create_scan(payload: ExtensionScanPayload):
+    if hasattr(payload, "model_dump"):
+        data = payload.model_dump()
+    else:
+        data = payload.dict()
+    
+    # Inject a fresh ISO UTC timestamp field
+    data["timestamp"] = datetime.now(timezone.utc).isoformat()
+    
+    # Append the validated dictionary directly into global SCAN_LEDGER list
+    SCAN_LEDGER.append(data)
+    
+    return {"status": "success", "message": "Scan logged successfully"}

@@ -29,3 +29,29 @@ def get_dashboard(db: Session = Depends(get_db)):
         },
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+from ..database.ledger import SCAN_LEDGER
+
+@router.get("/dashboard/stats")
+async def get_dashboard_stats():
+    total_files_processed = len(SCAN_LEDGER)
+    
+    total_threats_intercepted = sum(
+        1 for scan in SCAN_LEDGER 
+        if scan.get("risk_score", 0) > 0 or scan.get("hits_count", 0) > 0
+    )
+    
+    if total_files_processed > 0:
+        average_risk_score = sum(scan.get("risk_score", 0.0) for scan in SCAN_LEDGER) / total_files_processed
+        average_risk_score = round(average_risk_score, 2)
+    else:
+        average_risk_score = 0.0
+        
+    recent_scans = SCAN_LEDGER[-20:][::-1]
+    
+    return {
+        "total_files_processed": total_files_processed,
+        "total_threats_intercepted": total_threats_intercepted,
+        "average_risk_score": average_risk_score,
+        "recent_scans": recent_scans
+    }
