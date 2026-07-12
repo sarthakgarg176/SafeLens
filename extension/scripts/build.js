@@ -38,6 +38,7 @@ async function runBuild() {
           input: {
             popup: resolve(publicDir, 'popup.html'),
             offscreen: resolve(publicDir, 'offscreen.html'),
+            sandbox: resolve(publicDir, 'sandbox.html'),
           },
           output: {
             entryFileNames: 'assets/[name]-[hash].js',

@@ -33,6 +33,14 @@ let logScanLock = Promise.resolve();
 
 const handlers = {
   /**
+   * PING handler to forcefully wake up the Service Worker and ensure 
+   * synchronous top-level execution (like session setAccessLevel) completes.
+   */
+  PING: async () => {
+    console.log('[MessageRouter] PING message received. Sending PING response.');
+    return { ok: true };
+  },
+  /**
    * Preprocesses intercepted image files using local OpenCV.js (WASM) inside the Service Worker.
    * Runs OffscreenCanvas operations completely isolated from host webpage scopes.
    */
@@ -73,14 +81,22 @@ const handlers = {
    * Runs the complete local privacy protection pipeline on the file's ArrayBuffer.
    */
   RUN_PROTECT_PIPELINE: async (payload) => {
-    if (!payload || !payload.arrayBuffer) {
-      throw new Error('Invalid payload: arrayBuffer is required');
+    if (!payload || (!payload.arrayBuffer && !payload.storageKey)) {
+      throw new Error('Invalid payload: arrayBuffer or storageKey is required');
     }
+
+    let arrayBuffer = payload.arrayBuffer;
+    if (payload.storageKey) {
+      const storageData = await chrome.storage.session.get(payload.storageKey);
+      arrayBuffer = storageData[payload.storageKey];
+      await chrome.storage.session.remove(payload.storageKey);
+      console.log('[MessageRouter] image transferred via storage.session successfully');
+    }
+
+    const { name, type, settings } = payload;
 
     // Ensure OpenCV.js is fully loaded and ready
     await waitForOpenCV();
-
-    const { arrayBuffer, name, type, settings } = payload;
 
     // Build background-safe File interface mock object
     const mockFile = {
@@ -99,9 +115,12 @@ const handlers = {
       outBuffer = arrayBuffer;
     }
 
+    const outKey = 'protected_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    await chrome.storage.session.set({ [outKey]: outBuffer });
+
     return {
       success: result.success !== false,
-      arrayBuffer: outBuffer,
+      storageKey: outKey,
       name: (result.protectedFile && result.protectedFile.name) || name,
       type: (result.protectedFile && result.protectedFile.type) || type,
       phash: result.phash || '',

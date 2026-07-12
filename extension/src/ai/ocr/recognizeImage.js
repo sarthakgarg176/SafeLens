@@ -2,6 +2,7 @@ import { runOCROnWorker } from './tesseractWorker.js';
 import { extractWords } from './extractWords.js';
 import { extractLines } from './extractLines.js';
 import { extractBoundingBoxes } from './extractBoundingBoxes.js';
+import { sendToOffscreen } from '../../background/offscreenManager.js';
 
 /**
  * Image Text Recognizer (OCR)
@@ -11,24 +12,7 @@ import { extractBoundingBoxes } from './extractBoundingBoxes.js';
  * - Coordinates extraction of words, lines, and bounding box arrays.
  * - Measures latency metrics.
  * - Implements graceful fallback, preventing exceptions from crashing the parent pipeline.
- * 
- * Input/Output Contract:
- * - Input: HTMLCanvasElement or OffscreenCanvas
- * - Output: Promise<{
- *     text: string,
- *     confidence: number,
- *     words: Object[],
- *     lines: Object[],
- *     boundingBoxes: Object[],
- *     processingTime: number,
- *     error?: string
- *   }>
- * 
- * Interacts with:
- * - extension/src/ai/ocr/tesseractWorker.js
- * - extension/src/ai/ocr/extractWords.js
- * - extension/src/ai/ocr/extractLines.js
- * - extension/src/ai/ocr/extractBoundingBoxes.js
+ * - Automatically delegates OCR execution to the Offscreen Document when running in MV3 Service Worker.
  */
 
 /**
@@ -46,6 +30,37 @@ import { extractBoundingBoxes } from './extractBoundingBoxes.js';
  * }>} Complete OCR result payload
  */
 export async function recognizeImage(canvas) {
+  // If in Service Worker, delegate to the Offscreen Document where Web Workers are supported
+  if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
+    console.log('[RecognizeImage] Running in Service Worker. Delegating OCR to Offscreen Document...');
+    try {
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Fixed: Convert raw buffer into a safe primitive Array to prevent data detachment during IPC serialization
+      const pixelArray = Array.from(imgData.data);
+
+      const result = await sendToOffscreen('RECOGNIZE_IMAGE', {
+        width: canvas.width,
+        height: canvas.height,
+        data: pixelArray
+      });
+
+      return result;
+    } catch (error) {
+      console.error('[RecognizeImage] Offscreen OCR delegation failed.', error);
+      return {
+        text: '',
+        confidence: 0,
+        words: [],
+        lines: [],
+        boundingBoxes: [],
+        processingTime: 0,
+        error: error.message
+      };
+    }
+  }
+
   const startTime = Date.now();
   console.log('[RecognizeImage] Triggering character recognition loop...');
 

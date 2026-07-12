@@ -6,39 +6,9 @@ import { applyThreshold } from './threshold.js';
 
 /**
  * OpenCV.js Image Preprocessing Orchestrator
- * 
- * Responsibility:
- * - Coordinates the execution of OpenCV binarization, filtering, and straightening.
- * - Enforces the optimized sequence: Resize -> Grayscale -> Denoise -> Deskew -> Threshold.
- * - Wraps stages in error boundaries to implement graceful fallbacks.
- * - Returns a processed canvas optimized for downstream Tesseract character scanning.
- * 
- * Input/Output Contract:
- * - Input: HTMLCanvasElement or OffscreenCanvas, options (Object)
- * - Output: Promise<HTMLCanvasElement|OffscreenCanvas> (Preprocessed canvas)
- * 
- * Interacts with:
- * - extension/src/services/scanService.js (Invokes this pipeline prior to OCR)
  */
-
 import { sendToOffscreen } from '../../background/offscreenManager.js';
 
-/**
- * Runs the complete OpenCV.js preprocessing pipeline.
- * If running in the background Service Worker, this proxies the execution to the
- * Offscreen Document to comply with Manifest V3 limitations (no eval, no importScripts).
- * If any individual filter stage fails, the pipeline logs a warning and moves to
- * the next filter step, ensuring the upload process remains active and stable.
- * 
- * @param {HTMLCanvasElement|OffscreenCanvas} imageSource - The canvas containing the uploaded image
- * @param {Object} [options] - Configuration settings
- * @param {boolean} [options.enableDenoise=true] - Toggle Gaussian noise filter
- * @param {boolean} [options.enableDeskew=true] - Toggle Hough deskewing correction
- * @param {number} [options.thresholdValue=127] - Global fallback binarizer threshold
- * @param {number} [options.maxWidth=1920] - Maximum width boundary
- * @param {number} [options.maxHeight=1080] - Maximum height boundary
- * @returns {Promise<HTMLCanvasElement|OffscreenCanvas>} Preprocessed output canvas
- */
 export async function preprocessImage(imageSource, options = {}) {
   // If in Service Worker, delegate to the Offscreen Document
   if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
@@ -46,13 +16,29 @@ export async function preprocessImage(imageSource, options = {}) {
     try {
       const ctx = imageSource.getContext('2d');
       const imgData = ctx.getImageData(0, 0, imageSource.width, imageSource.height);
-      
+
+      console.log({
+        width: imageSource.width,
+        height: imageSource.height,
+        imageDataLength: imgData.data.length,
+        byteLength: imgData.data.buffer.byteLength
+      });
+
+      // Pass regular raw base array structure safely to avoid structural IPC clone crash
+      const pixelArray = Array.from(imgData.data);
+
       const result = await sendToOffscreen('PREPROCESS_IMAGE', {
         width: imageSource.width,
         height: imageSource.height,
-        data: imgData.data.buffer,
+        data: pixelArray,
         options
       });
+
+      console.log("===== RESULT FROM OFFSCREEN =====");
+      console.log(result);
+      console.log("data =", result?.data);
+      console.log("constructor =", result?.data?.constructor?.name);
+      console.log("length =", result?.data?.length);
 
       const outputCanvas = typeof OffscreenCanvas !== 'undefined'
         ? new OffscreenCanvas(result.width, result.height)
@@ -81,25 +67,24 @@ export async function preprocessImage(imageSource, options = {}) {
 
   console.log('[Preprocessor] Beginning OpenCV.js image preprocessing pipeline...');
   const startTime = Date.now();
-
   let canvas = imageSource;
 
   try {
-    // 1. Resize (Scales down early to reduce subsequent compute load)
+    // 1. Resize
     try {
       canvas = await resizeCanvas(canvas, maxWidth, maxHeight);
     } catch (e) {
       console.warn('[Preprocessor] Resize stage failed. Continuing...', e);
     }
 
-    // 2. Grayscale (Discards chromatic noise)
+    // 2. Grayscale
     try {
       canvas = await toGrayscale(canvas);
     } catch (e) {
       console.warn('[Preprocessor] Grayscale stage failed. Continuing...', e);
     }
 
-    // 3. Denoise (Gaussian Blur smoothing)
+    // 3. Denoise
     if (enableDenoise) {
       try {
         canvas = await denoiseImage(canvas);
@@ -108,19 +93,19 @@ export async function preprocessImage(imageSource, options = {}) {
       }
     }
 
-    // 4. Deskew (Straightens line segments)
+    // 4. Deskew (Fixed Typo)
     let deskewAngle = 0;
     if (enableDeskew) {
       try {
         const deskewResult = await deskewCanvas(canvas);
         canvas = deskewResult.canvas;
-        deskewAngle = deskewResult.angle;
+        deskewAngle = deskewResult.angle; 
       } catch (e) {
         console.warn('[Preprocessor] Deskew stage failed. Continuing...', e);
       }
     }
 
-    // 5. Binarize (Adaptive Gaussian binarization)
+    // 5. Binarize
     try {
       canvas = await applyThreshold(canvas, thresholdValue);
     } catch (e) {
@@ -129,11 +114,10 @@ export async function preprocessImage(imageSource, options = {}) {
 
     const latency = Date.now() - startTime;
     console.log(`[Preprocessor] Pipeline resolved successfully in ${latency}ms. Skew Angle: ${deskewAngle.toFixed(2)} deg.`);
-    
     return canvas;
 
   } catch (error) {
     console.error('[Preprocessor] Critical pipeline failure. Returning original image.', error);
-    return imageSource; // Return input unmodified on catastrophic error to ensure the file uploads
+    return imageSource;
   }
 }

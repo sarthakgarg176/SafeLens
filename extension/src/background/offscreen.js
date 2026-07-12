@@ -1,32 +1,6 @@
-import { preprocessImage } from '../ai/preprocessing/preprocessImage.js';
+import { recognizeImage } from '../ai/ocr/recognizeImage.js';
 
 console.log('[Offscreen] Offscreen script loaded and initializing...');
-
-// Helper to wait until OpenCV.js is fully loaded in global scope
-async function waitForOpenCV() {
-  if (typeof cv !== 'undefined' && cv.matFromImageData) {
-    return;
-  }
-
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (typeof cv !== 'undefined' && cv.matFromImageData) {
-        clearInterval(interval);
-        resolve();
-      } else if (attempts > 100) { // 10 seconds timeout
-        clearInterval(interval);
-        reject(new Error('OpenCV.js loading in Offscreen Document timed out (10s)'));
-      }
-    }, 100);
-  });
-}
-
-// Ensure cv is initialized
-waitForOpenCV()
-  .then(() => console.log('[Offscreen] OpenCV.js is fully loaded and ready.'))
-  .catch((err) => console.error('[Offscreen] OpenCV.js initialization error:', err));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.target !== 'offscreen') {
@@ -34,37 +8,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'PREPROCESS_IMAGE') {
+    console.log('[Offscreen] PREPROCESS_IMAGE message received.');
     const { width, height, data, options } = message.payload;
-    
+
+    console.log("========== OFFSCREEN RECEIVED ==========");
+    console.log("Array?", Array.isArray(data));
+    console.log("length =", data?.length);
+
     (async () => {
       try {
-        await waitForOpenCV();
+        const iframe = document.getElementById('sandbox-iframe');
+        if (!iframe || !iframe.contentWindow) {
+          throw new Error('Sandbox iframe not found or inaccessible');
+        }
 
-        // 1. Reconstruct canvas from serialized pixel buffer
-        const canvas = typeof OffscreenCanvas !== 'undefined'
-          ? new OffscreenCanvas(width, height)
-          : document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        const messageId = Date.now().toString() + Math.random().toString();
+        const responsePromise = new Promise((resolve, reject) => {
+          const listener = (event) => {
+            if (event.data && event.data.messageId === messageId && event.data.type === 'PREPROCESS_IMAGE_RESULT') {
+              window.removeEventListener('message', listener);
+              if (event.data.success) {
+                resolve(event.data.payload);
+              } else {
+                reject(new Error(event.data.error || 'Sandbox returned failure'));
+              }
+            }
+          };
+          window.addEventListener('message', listener);
+        });
 
-        const ctx = canvas.getContext('2d');
-        const imgData = new ImageData(new Uint8ClampedArray(data), width, height);
-        ctx.putImageData(imgData, 0, 0);
+        console.log('[Offscreen] Forwarding array payload to sandbox iframe...');
+        iframe.contentWindow.postMessage({
+          type: 'PREPROCESS_IMAGE',
+          payload: { width, height, data, options, messageId }
+        }, '*');
 
-        // 2. Execute local OpenCV.js preprocessing pipeline
-        const preprocessedCanvas = await preprocessImage(canvas, options);
+        const processedPayload = await responsePromise;
+        console.log("===== RESULT FROM SANDBOX =====");
+        console.log("Array?", Array.isArray(processedPayload.data));
+        console.log("length =", processedPayload.data?.length);
 
-        // 3. Extract and serialize preprocessed pixels
-        const outCtx = preprocessedCanvas.getContext('2d');
-        const outImgData = outCtx.getImageData(0, 0, preprocessedCanvas.width, preprocessedCanvas.height);
-        
         sendResponse({
           success: true,
-          payload: {
-            width: preprocessedCanvas.width,
-            height: preprocessedCanvas.height,
-            data: outImgData.data.buffer
-          }
+          payload: processedPayload
         });
       } catch (error) {
         console.error('[Offscreen] Preprocessing error:', error);
@@ -75,8 +61,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })();
 
-    return true; // Keep the runtime channel open for asynchronous response
+    return true;
   }
 
+  if (message.type === 'RECOGNIZE_IMAGE') {
+    console.log('[Offscreen] RECOGNIZE_IMAGE message received.');
+    const { width, height, data } = message.payload;
+
+    (async () => {
+      try {
+        // 1. Reconstruct canvas properly
+        const canvas = typeof OffscreenCanvas !== 'undefined'
+          ? new OffscreenCanvas(width, height)
+          : document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        const imgData = new ImageData(new Uint8ClampedArray(data), width, height);
+        ctx.putImageData(imgData, 0, 0);
+
+        console.log('[Offscreen] Executing recognizeImage() with reconstructed canvas...');
+        // Pass the fully loaded canvas object downstream
+        const ocrResult = await recognizeImage(canvas);
+        console.log('[Offscreen] recognizeImage() complete.');
+
+        sendResponse({
+          success: true,
+          payload: ocrResult
+        });
+      } catch (error) {
+        console.error('[Offscreen] OCR error:', error);
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown offscreen OCR failure'
+        });
+      }
+    })();
+
+    return true;
+  }
   return false;
 });

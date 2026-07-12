@@ -1,20 +1,13 @@
 import { createWorker } from 'tesseract.js';
 
 /**
- * Tesseract.js Worker Manager
+ * Tesseract.js Worker Manager (Manifest V3 Optimized)
  * 
  * Responsibility:
  * - Creates, initializes, and terminates Tesseract OCR worker instances locally.
  * - Caches the worker instance globally to avoid thread spin-up overhead.
  * - Implements a Promise-based lock queue to serialize concurrent scan operations.
- * - Conforms to Manifest V3 CSP constraints by utilizing local asset paths.
- * 
- * Input/Output Contract:
- * - Input: None (lazily initialized)
- * - Output: Promise<Tesseract.Worker>
- * 
- * Interacts with:
- * - extension/src/ai/ocr/recognizeImage.js (Invokes workers for recognition runs)
+ * - Bypasses MV3 Blob CSP limits by executing directly from the extension origin.
  */
 
 let cachedWorker = null;
@@ -43,20 +36,21 @@ export async function getOCRWorker(lang = 'eng') {
     try {
       console.log(`[TesseractWorker] Spawning local OCR worker for language: ${lang}...`);
 
-      // Point Tesseract configuration to local Chrome Extension directories
+      // Point Tesseract configuration to local build directory root structure
       const workerPath = chrome.runtime.getURL('tesseract/worker.min.js');
       const corePath = chrome.runtime.getURL('tesseract/tesseract-core.wasm.js');
-      const langPath = chrome.runtime.getURL('tesseract/');
+      const langPath = chrome.runtime.getURL('tesseract/'); // Enforced trailing slash
 
       console.log('[TesseractWorker] Configuring local sandboxed paths:', { workerPath, corePath, langPath });
 
-      // Create local worker instance (Vite bundles tesseract.js)
+      // Create local worker instance
       const worker = await createWorker(lang, 1, {
         workerPath,
         corePath,
         langPath,
-        cacheMethod: 'none', // Prevent trying to write to browser IndexedDB caches
-        gzip: true,          // eng.traineddata.gz is compressed
+        workerBlobURL: false, // <-- CRITICAL MV3 FIX: Disables Blob workers to bypass importScripts CSP
+        cacheMethod: 'none',   // Prevent trying to write to browser IndexedDB caches
+        gzip: true,            // eng.traineddata.gz is compressed
         logger: (m) => {
           if (m.status === 'recognizing text') {
             console.log(`[TesseractWorker] OCR Progress: ${Math.round(m.progress * 100)}%`);
@@ -100,11 +94,11 @@ export async function runOCROnWorker(canvas) {
   try {
     const worker = await getOCRWorker();
 
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    // Call Tesseract OCR on raw pixel array (no image copies)
-    const result = await worker.recognize(imgData);
+    console.log('[TesseractWorker] Invoking worker.recognize directly with canvas context object...');
+    
+    // FIX: Pass the raw canvas directly! Tesseract automatically extracts pixels 
+    // seamlessly from canvas/offscreenCanvas environments without crashing Leptonica.
+    const result = await worker.recognize(canvas);
     return result;
 
   } finally {

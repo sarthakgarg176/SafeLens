@@ -63,6 +63,12 @@ export async function sendToOffscreen(type, payload, timeoutMs = 15000) {
         reject(new Error(`Offscreen execution timed out after ${timeoutMs}ms`));
       }, timeoutMs);
 
+      console.log("========= BEFORE SENDMESSAGE =========");
+      console.log(payload);
+      console.log(payload.data?.constructor?.name);
+      console.log(payload.data?.byteLength);
+      console.log("======================================");
+
       chrome.runtime.sendMessage({
         target: 'offscreen',
         type,

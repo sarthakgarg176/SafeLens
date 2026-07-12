@@ -40,6 +40,7 @@ export async function fileToCanvas(file) {
     const arrayBuffer = await file.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: file.type || 'image/png' });
     const imageBitmap = await createImageBitmap(blob);
+    console.log('[ScanService] createImageBitmap succeeded');
     const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(imageBitmap, 0, 0);
@@ -148,7 +149,7 @@ export async function runScanPipeline(file, options = {}) {
         size: file.size,
         type: file.type
       },
-      error: error instanceof Error ? error.message : 'Unknown scanning runtime failure'
+      error: error instanceof Error ? error.message : 'Unknown scan pipeline failure'
     };
   }
 }

@@ -90,11 +90,44 @@ async function runPipeline(files, settings) {
         console.log('[UploadInterceptor] Serializing and delegating file to SW:', file.name);
         const arrayBuffer = await file.arrayBuffer();
 
+        // 1. Logs added before PING
+        console.log('====================================');
+        console.log('A: Before PING');
+        console.log('chrome =', chrome);
+        console.log('chrome.runtime =', chrome?.runtime);
+        console.log('typeof sendMessage =', typeof chrome?.runtime?.sendMessage);
+        console.log('====================================');
+
+        console.log('[UploadInterceptor] Sending PING to wake Service Worker...');
+        await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'PING' }, (res) => {
+            if (chrome.runtime.lastError) {
+              console.warn('[UploadInterceptor] PING failed or no response:', chrome.runtime.lastError.message);
+            } else {
+              console.log('[UploadInterceptor] PING response received. SW is awake.');
+            }
+            resolve(res);
+          });
+        });
+
+        console.log('[UploadInterceptor] PING complete. typeof chrome.storage.session:', typeof chrome.storage.session);
+
+        const storageKey = 'pending_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        await chrome.storage.session.set({ [storageKey]: arrayBuffer });
+
+        // 2. Logs added before RUN_PROTECT_PIPELINE
+        console.log('====================================');
+        console.log('B: Before RUN_PROTECT_PIPELINE');
+        console.log('chrome =', chrome);
+        console.log('chrome.runtime =', chrome?.runtime);
+        console.log('typeof sendMessage =', typeof chrome?.runtime?.sendMessage);
+        console.log('====================================');
+
         const response = await new Promise((resolve) => {
           chrome.runtime.sendMessage({
             type: 'RUN_PROTECT_PIPELINE',
             payload: {
-              arrayBuffer: arrayBuffer,
+              storageKey: storageKey,
               name: file.name,
               type: file.type,
               settings: settings
@@ -111,7 +144,16 @@ async function runPipeline(files, settings) {
 
         if (response && response.success && response.data) {
           const resData = response.data;
-          const blob = new Blob([resData.arrayBuffer], { type: resData.type });
+          let outBuffer;
+          if (resData.storageKey) {
+            const storageData = await chrome.storage.session.get(resData.storageKey);
+            outBuffer = storageData[resData.storageKey];
+            await chrome.storage.session.remove(resData.storageKey);
+          } else {
+            outBuffer = resData.arrayBuffer || arrayBuffer; // fallback
+          }
+
+          const blob = new Blob([outBuffer], { type: resData.type });
           const protectedFile = new File([blob], resData.name, {
             type: resData.type,
             lastModified: Date.now()
@@ -186,6 +228,14 @@ async function runPipeline(files, settings) {
       } catch (err) {
         console.warn('[UploadInterceptor] Backend asset registration bypassed (server offline):', err.message);
       }
+
+      // 3. Logs added before LOG_SCAN
+      console.log('====================================');
+      console.log('C: Before LOG_SCAN');
+      console.log('chrome =', chrome);
+      console.log('chrome.runtime =', chrome?.runtime);
+      console.log('typeof sendMessage =', typeof chrome?.runtime?.sendMessage);
+      console.log('====================================');
 
       // 2. Dispatch LOG_SCAN message to background Service Worker
       try {

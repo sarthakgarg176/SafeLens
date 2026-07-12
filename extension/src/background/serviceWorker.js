@@ -14,6 +14,12 @@
 import { DEFAULT_SETTINGS } from '../config/defaults.js';
 import { routeMessage } from './messageRouter.js';
 
+// Enable storage.session for content scripts (untrusted contexts)
+if (chrome.storage.session && chrome.storage.session.setAccessLevel) {
+  chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS' });
+  console.log('[ServiceWorker] chrome.storage.session.setAccessLevel() executed');
+}
+
 /**
  * Handle Extension installation or updates
  */
@@ -44,8 +50,23 @@ chrome.runtime.onInstalled.addListener(async (details) => {
  * We must return `true` to signify we want to resolve the sendResponse callback asynchronously.
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[ServiceWorker] Raw onMessage received:', message ? message.type : 'unknown');
   routeMessage(message, sender)
     .then((response) => {
+      // ==================== ADDED DEBUGGING LOGS START ====================
+      // Intercepting response packet if it contains execution results from offscreen/pipeline
+      if (response && response.success && response.payload) {
+        const result = response.payload;
+        
+        console.log("===== RESULT FROM OFFSCREEN =====");
+        console.log(result);
+        console.log(result.data);
+        console.log(result.data?.constructor?.name);
+        console.log(result.data?.byteLength);
+        console.log(result.data?.length);
+      }
+      // ==================== ADDED DEBUGGING LOGS END ======================
+
       sendResponse(response);
     })
     .catch((err) => {
@@ -58,4 +79,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
   return true; // Keep the runtime communication channel open for asynchronous response
 });
-
