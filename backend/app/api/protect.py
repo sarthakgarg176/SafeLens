@@ -93,16 +93,25 @@ async def protect_image(
     new_asset = Asset(
         filename=image.filename,
         source_website=None,
-        thumbnail_path=thumb_path,
+        thumbnail_path=f"http://localhost:8000/storage/thumbnails/{asset_id}_thumb.png",
         phash=phash,
         whash=whash,
         watermark_id=watermark_id,
         status="Protected",
         timestamp=datetime.now(timezone.utc)
     )
-    db.add(new_asset)
-    db.commit()
-    db.refresh(new_asset)
+    try:
+        db.add(new_asset)
+        db.commit()
+        db.refresh(new_asset)
+    except Exception as e:
+        db.rollback()
+        # Clean up physically created files on database failure
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
+        raise HTTPException(status_code=500, detail=f"Database registration failed: {str(e)}")
 
     return {
         "success": True,
@@ -113,8 +122,8 @@ async def protect_image(
             "watermark_id": watermark_id,
             "phash": phash,
             "whash": whash,
-            "protected_image_path": file_path,
-            "thumbnail_path": thumb_path,
+            "protected_image_path": f"http://localhost:8000/storage/uploads/{filename}",
+            "thumbnail_path": f"http://localhost:8000/storage/thumbnails/{asset_id}_thumb.png",
             "created_at": new_asset.timestamp.isoformat()
         },
         "timestamp": datetime.now(timezone.utc).isoformat()

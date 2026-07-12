@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base style resets to match extensions size specifications */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #08090c;
+  color: #c5c6c7;
+  font-family: 'Outfit', sans-serif;
+  width: 360px;
+  min-height: 480px;
+  overflow-x: hidden;
+}
+
+/* Clean, modern scrollbar designs */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 252, 241, 0.3);
+}
