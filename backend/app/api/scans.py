@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form, Depends
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
-from ..database.models import Asset, Alert
+from ..database.models import Asset, Alert, Action
 from datetime import datetime, timezone
 import os, shutil, uuid
 import imagehash
@@ -108,8 +108,6 @@ async def upload_scan(
         }
     }
 
-from ..database.ledger import SCAN_LEDGER
-
 class ExtensionScanPayload(BaseModel):
     scan_id: str
     document_context: str
@@ -119,16 +117,37 @@ class ExtensionScanPayload(BaseModel):
     has_redacted_image: bool
 
 @router.post("/scans", status_code=201)
-async def create_scan(payload: ExtensionScanPayload):
-    if hasattr(payload, "model_dump"):
-        data = payload.model_dump()
-    else:
-        data = payload.dict()
-    
-    # Inject a fresh ISO UTC timestamp field
-    data["timestamp"] = datetime.now(timezone.utc).isoformat()
-    
-    # Append the validated dictionary directly into global SCAN_LEDGER list
-    SCAN_LEDGER.append(data)
-    
+async def create_scan(payload: ExtensionScanPayload, db: Session = Depends(get_db)):
+    # 1. Create a new record in the Asset table
+    new_asset = Asset(
+        filename=f"scan_{payload.scan_id}",
+        status="Redacted" if payload.has_redacted_image else "Protected",
+        confidence_before=payload.risk_score,
+        timestamp=datetime.now(timezone.utc)
+    )
+    db.add(new_asset)
+    db.flush()
+
+    # 2. Conditionally insert corresponding rows into Alert and Action tables when threats are found
+    if payload.risk_score > 0.0 or payload.hits_count > 0:
+        new_alert = Alert(
+            asset_id=new_asset.id,
+            matched_url=payload.document_context,
+            match_confidence=payload.risk_score / 10.0,
+            severity="Serious" if payload.risk_score >= 3.0 else "Normal",
+            status="Open",
+            timestamp=datetime.now(timezone.utc)
+        )
+        db.add(new_alert)
+        db.flush()
+
+        new_action = Action(
+            alert_id=new_alert.id,
+            action_type="Canvas Redaction" if payload.has_redacted_image else "Pass",
+            status="Completed" if payload.has_redacted_image else "Allowed",
+            timestamp=datetime.now(timezone.utc)
+        )
+        db.add(new_action)
+
+    db.commit()
     return {"status": "success", "message": "Scan logged successfully"}
