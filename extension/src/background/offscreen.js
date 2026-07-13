@@ -2,21 +2,53 @@ import { recognizeImage } from '../ai/ocr/recognizeImage.js';
 
 console.log('[Offscreen] Offscreen script loaded and initializing...');
 
+// Hyper-Fast Stack-Safe Helpers
+function arrayBufferToBase64(buffer) {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  if (!base64) return new ArrayBuffer(0);
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.target !== 'offscreen') {
     return false;
   }
 
+  if (message.type === 'PING') {
+    sendResponse({ success: true, from: 'offscreen' });
+    return false;
+  }
+
   if (message.type === 'PREPROCESS_IMAGE') {
     console.log('[Offscreen] PREPROCESS_IMAGE message received.');
-    const { width, height, data, options } = message.payload;
-
-    console.log("========== OFFSCREEN RECEIVED ==========");
-    console.log("Array?", Array.isArray(data));
-    console.log("length =", data?.length);
+    const { width, height, base64Data, options } = message.payload;
 
     (async () => {
       try {
+        if (!base64Data) {
+          throw new Error(`Preprocess pipeline source data missing in payload`);
+        }
+        
+        const buffer = base64ToArrayBuffer(base64Data);
+        // THE FIX: Directly pass the TypedArray! Structured cloning handles it instantly. No Array.from() bottleneck!
+        const data = new Uint8ClampedArray(buffer);
+
         const iframe = document.getElementById('sandbox-iframe');
         if (!iframe || !iframe.contentWindow) {
           throw new Error('Sandbox iframe not found or inaccessible');
@@ -37,20 +69,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           window.addEventListener('message', listener);
         });
 
-        console.log('[Offscreen] Forwarding array payload to sandbox iframe...');
+        console.log('[Offscreen] Forwarding raw memory payload to sandbox iframe...');
         iframe.contentWindow.postMessage({
           type: 'PREPROCESS_IMAGE',
           payload: { width, height, data, options, messageId }
         }, '*');
 
         const processedPayload = await responsePromise;
-        console.log("===== RESULT FROM SANDBOX =====");
-        console.log("Array?", Array.isArray(processedPayload.data));
-        console.log("length =", processedPayload.data?.length);
+        
+        // Smartly extract buffer depending on how the sandbox returned it
+        let outBuffer;
+        if (processedPayload.data instanceof ArrayBuffer) {
+            outBuffer = processedPayload.data;
+        } else if (processedPayload.data.buffer) {
+            outBuffer = processedPayload.data.buffer;
+        } else {
+            outBuffer = new Uint8ClampedArray(processedPayload.data).buffer;
+        }
+        
+        const outBase64 = arrayBufferToBase64(outBuffer);
 
         sendResponse({
           success: true,
-          payload: processedPayload
+          payload: {
+            width: processedPayload.width,
+            height: processedPayload.height,
+            base64Data: outBase64
+          }
         });
       } catch (error) {
         console.error('[Offscreen] Preprocessing error:', error);
@@ -66,23 +111,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'RECOGNIZE_IMAGE') {
     console.log('[Offscreen] RECOGNIZE_IMAGE message received.');
-    const { width, height, data } = message.payload;
+    const { width, height, base64Data } = message.payload;
 
     (async () => {
       try {
-        // 1. Reconstruct canvas properly
+        if (!base64Data) {
+          throw new Error(`OCR processing source data missing in payload`);
+        }
+
+        const buffer = base64ToArrayBuffer(base64Data);
+
         const canvas = typeof OffscreenCanvas !== 'undefined'
           ? new OffscreenCanvas(width, height)
           : document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext('2d');
-        const imgData = new ImageData(new Uint8ClampedArray(data), width, height);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const imgData = new ImageData(new Uint8ClampedArray(buffer), width, height);
         ctx.putImageData(imgData, 0, 0);
 
         console.log('[Offscreen] Executing recognizeImage() with reconstructed canvas...');
-        // Pass the fully loaded canvas object downstream
         const ocrResult = await recognizeImage(canvas);
         console.log('[Offscreen] recognizeImage() complete.');
 

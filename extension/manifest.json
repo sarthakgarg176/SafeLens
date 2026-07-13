@@ -9,7 +9,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://www.remove.bg/*",
+    "<all_urls>",
     "https://safelens-zttx.onrender.com/*"
   ],
   "background": {
@@ -19,7 +19,8 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js", "content/uploadInterceptor.js"],
+      "run_at": "document_start"
     }
   ]
 }

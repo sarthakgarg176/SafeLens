@@ -96,7 +96,7 @@ export async function generateWHash(canvas) {
     tempCanvas.width = DWT_SIZE;
     tempCanvas.height = DWT_SIZE;
 
-    const ctx = tempCanvas.getContext('2d');
+    const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(canvas, 0, 0, DWT_SIZE, DWT_SIZE);
 
     const imgData = ctx.getImageData(0, 0, DWT_SIZE, DWT_SIZE);

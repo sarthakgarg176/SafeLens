@@ -8,6 +8,29 @@ import { bridgeClient } from '../communication/bridgeClient.js';
 
 let logScanLock = Promise.resolve();
 
+// Helper to convert ArrayBuffer to Base64 (Iterative to strictly prevent call stack size overflow)
+function arrayBufferToBase64(buffer) {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// Helper to convert Base64 back to ArrayBuffer safely
+function base64ToArrayBuffer(base64) {
+  if (!base64) return new ArrayBuffer(0);
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
 const handlers = {
   PING: async () => {
     console.log('[MessageRouter] PING message received. Sending PING response.');
@@ -23,7 +46,7 @@ const handlers = {
     const blob = new Blob([arrayBuffer], { type: type || 'image/png' });
     const imageBitmap = await createImageBitmap(blob);
     const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(imageBitmap, 0, 0);
 
     const preprocessedCanvas = await preprocessImage(canvas, settings);
@@ -38,17 +61,36 @@ const handlers = {
   },
 
   RUN_PROTECT_PIPELINE: async (payload) => {
-    if (!payload || (!payload.arrayBuffer && !payload.storageKey)) {
-      throw new Error('Invalid payload: arrayBuffer or storageKey is required');
+    if (!payload || (!payload.arrayBuffer && !payload.base64Data && !payload.storageKey)) {
+      throw new Error('Invalid payload: base64Data or arrayBuffer is required');
     }
 
     let arrayBuffer = payload.arrayBuffer;
-    if (payload.storageKey) {
-      const storageData = await chrome.storage.session.get(payload.storageKey);
-      arrayBuffer = storageData[payload.storageKey];
-      await chrome.storage.session.remove(payload.storageKey);
-      console.log('[MessageRouter] image transferred via storage.session successfully');
+    if (payload.base64Data) {
+      arrayBuffer = base64ToArrayBuffer(payload.base64Data);
+    } else if (payload.storageKey) {
+      const storageData = await chrome.storage.local.get(payload.storageKey);
+      const storedValue = storageData ? storageData[payload.storageKey] : null;
+      
+      if (typeof storedValue === 'string') {
+        arrayBuffer = base64ToArrayBuffer(storedValue);
+      } else if (storedValue && storedValue.byteLength) {
+        arrayBuffer = storedValue;
+      } else if (storedValue && typeof storedValue === 'object') {
+        arrayBuffer = storedValue;
+      }
+      
+      if (arrayBuffer && arrayBuffer.byteLength > 0) {
+        await chrome.storage.local.remove(payload.storageKey);
+      }
     }
+
+    if (!arrayBuffer || !arrayBuffer.byteLength) {
+      throw new Error('Invalid or corrupted image arrayBuffer received in pipeline gateway');
+    }
+
+    const incomingStorageKey = 'pending_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    await chrome.storage.local.set({ [incomingStorageKey]: arrayBufferToBase64(arrayBuffer) });
 
     const { name, type, settings } = payload;
     await waitForOpenCV();
@@ -62,6 +104,8 @@ const handlers = {
 
     const result = await protectImagePipeline(mockFile, settings);
     
+    await chrome.storage.local.remove(incomingStorageKey);
+
     let outBuffer;
     if (result.protectedFile && typeof result.protectedFile.arrayBuffer === 'function') {
       outBuffer = await result.protectedFile.arrayBuffer();
@@ -69,12 +113,9 @@ const handlers = {
       outBuffer = arrayBuffer;
     }
 
-    const outKey = 'protected_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    await chrome.storage.session.set({ [outKey]: outBuffer });
-
     return {
       success: result.success !== false,
-      storageKey: outKey,
+      base64Data: arrayBufferToBase64(outBuffer),
       name: (result.protectedFile && result.protectedFile.name) || name,
       type: (result.protectedFile && result.protectedFile.type) || type,
       phash: result.phash || '',
@@ -86,21 +127,31 @@ const handlers = {
     };
   },
 
-  /**
-   * New Handler: Securely executes binary uploads to deployed Render production API from SW context
-   */
   REGISTER_BACKEND_ASSET: async (payload) => {
-    if (!payload || !payload.storageKey) {
-      throw new Error('Invalid payload: storageKey containing image buffer is mandatory');
+    if (!payload || (!payload.storageKey && !payload.base64Data)) {
+      throw new Error('Invalid payload: storageKey or base64Data containing image buffer is mandatory');
     }
 
-    // 1. Recover arrayBuffer from session space safely
-    const storageData = await chrome.storage.session.get(payload.storageKey);
-    const arrayBuffer = storageData[payload.storageKey];
-    await chrome.storage.session.remove(payload.storageKey);
+    let arrayBuffer = null;
+    if (payload.base64Data) {
+      arrayBuffer = base64ToArrayBuffer(payload.base64Data);
+    } else if (payload.storageKey) {
+      const storageData = await chrome.storage.local.get(payload.storageKey);
+      const storedValue = storageData ? storageData[payload.storageKey] : null;
+      
+      if (typeof storedValue === 'string') {
+        arrayBuffer = base64ToArrayBuffer(storedValue);
+      } else if (storedValue && storedValue.byteLength) {
+        arrayBuffer = storedValue;
+      }
 
-    if (!arrayBuffer) {
-      throw new Error('Image data not found in background session allocation room');
+      if (arrayBuffer) {
+        await chrome.storage.local.remove(payload.storageKey);
+      }
+    }
+
+    if (!arrayBuffer || !arrayBuffer.byteLength) {
+      throw new Error('Image data not found or corrupted in background session allocation room');
     }
 
     const blob = new Blob([arrayBuffer], { type: payload.type || 'image/png' });
@@ -108,7 +159,6 @@ const handlers = {
 
     console.log('[MessageRouter] Dispatching isolated proxy upload process via BridgeClient framework...');
     
-    // 2. Delegate execution logic to centralized bridge network pipeline
     const result = await bridgeClient.uploadProtectedAsset(file, {
       blur_enabled: payload.blur_enabled,
       ai_cloak: payload.ai_cloak,
@@ -133,7 +183,7 @@ const handlers = {
 
   GET_SETTINGS: async () => {
     const data = await chrome.storage.local.get('settings');
-    return data.settings || {};
+    return data ? (data.settings || {}) : {};
   },
 
   LOG_SCAN: async (payload, sender) => {
@@ -152,7 +202,8 @@ const handlers = {
     await nextLock;
 
     try {
-      const { scans = [] } = await chrome.storage.local.get('scans');
+      const storageData = await chrome.storage.local.get('scans');
+      const scans = storageData && storageData.scans ? storageData.scans : [];
       const updatedScans = [payload, ...scans].slice(0, 100);
       await chrome.storage.local.set({ scans: updatedScans });
 
@@ -174,7 +225,8 @@ const handlers = {
 
           if (incidentResponse && incidentResponse.success && incidentResponse.incidentId) {
             payload.incidentId = incidentResponse.incidentId;
-            const { scans: currentScans = [] } = await chrome.storage.local.get('scans');
+            const currentStorage = await chrome.storage.local.get('scans');
+            const currentScans = currentStorage && currentStorage.scans ? currentStorage.scans : [];
             const finalScans = currentScans.map(s => {
               if (s.scanId === payload.scanId) {
                 return { ...s, incidentId: incidentResponse.incidentId };

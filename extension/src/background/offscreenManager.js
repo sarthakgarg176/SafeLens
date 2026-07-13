@@ -11,14 +11,34 @@ export async function ensureOffscreenDocument() {
   const url = 'public/offscreen.html';
 
   // Check if one already exists using runtime.getContexts (Chrome 116+)
+  let exists = false;
   if (chrome.runtime.getContexts) {
     const contexts = await chrome.runtime.getContexts({
       contextTypes: ['OFFSCREEN_DOCUMENT'],
       documentUrls: [chrome.runtime.getURL(url)]
     });
-    if (contexts.length > 0) {
-      return;
-    }
+    exists = contexts.length > 0;
+  }
+
+  if (exists) {
+    try {
+      // Dynamically verify if it's actively responding
+      const isAlive = await new Promise((resolve) => {
+        const timeoutId = setTimeout(() => resolve(false), 1000);
+        chrome.runtime.sendMessage({ target: 'offscreen', type: 'PING' }, (response) => {
+          clearTimeout(timeoutId);
+          resolve(response && response.from === 'offscreen');
+        });
+      });
+      if (isAlive) {
+        return; // Document is healthy
+      }
+    } catch (e) {}
+
+    console.warn('[OffscreenManager] Offscreen document unresponsive. Recreating...');
+    try {
+      await chrome.offscreen.closeDocument();
+    } catch (e) {}
   }
 
   // Avoid race conditions

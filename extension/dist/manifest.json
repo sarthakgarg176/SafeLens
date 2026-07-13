@@ -5,6 +5,7 @@
   "description": "Protects your privacy before uploading files to the web using client-side AI analysis and redaction.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "activeTab",
     "scripting",
     "offscreen"

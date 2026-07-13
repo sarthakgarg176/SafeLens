@@ -79,7 +79,7 @@ export async function embedWatermark(canvas, watermarkText) {
 
     console.log(`[WatermarkEngine] Embedding invisible DCT watermark: "${watermarkText}"`);
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const width = canvas.width;
     const height = canvas.height;
     const imgData = ctx.getImageData(0, 0, width, height);
@@ -182,7 +182,7 @@ export async function extractWatermark(canvas) {
       throw new TypeError('Canvas parameter is required');
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const width = canvas.width;
     const height = canvas.height;
     const imgData = ctx.getImageData(0, 0, width, height);

@@ -1,4 +1,4 @@
-const ke = {
+const Re = {
   protectionEnabled: !0,
   riskLevelThreshold: "medium",
   // low, medium, high
@@ -9,64 +9,64 @@ const ke = {
   allowedDomains: [],
   blurMode: "redact"
 };
-async function Me(e, t = 1920, n = 1080) {
+async function Ae(e, t = 1920, n = 1080) {
   if (!e)
     throw new TypeError("Canvas parameter is required");
   let r = null, o = null;
   try {
-    let { width: a, height: s } = e, l = !1;
-    if (a > t && (s = Math.round(s * t / a), a = t, l = !0), s > n && (a = Math.round(a * n / s), s = n, l = !0), !l)
+    let { width: a, height: i } = e, s = !1;
+    if (a > t && (i = Math.round(i * t / a), a = t, s = !0), i > n && (a = Math.round(a * n / i), i = n, s = !0), !s)
       return e;
-    if (console.log(`[Resize] Scaling image down to ${a}x${s} using cv.resize`), typeof cv > "u" || !cv.matFromImageData)
+    if (console.log(`[Resize] Scaling image down to ${a}x${i} using cv.resize`), typeof cv > "u" || !cv.matFromImageData)
       throw new Error("OpenCV.js runtime is not loaded");
-    const h = e.getContext("2d").getImageData(0, 0, e.width, e.height);
+    const h = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height);
     r = cv.matFromImageData(h), o = new cv.Mat();
-    const m = new cv.Size(a, s);
+    const m = new cv.Size(a, i);
     cv.resize(r, o, m, 0, 0, cv.INTER_AREA);
-    const i = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(a, s) : document.createElement("canvas");
-    i.width = a, i.height = s;
-    const f = i.getContext("2d"), p = new ImageData(new Uint8ClampedArray(o.data), o.cols, o.rows);
-    return f.putImageData(p, 0, 0), i;
+    const c = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(a, i) : document.createElement("canvas");
+    c.width = a, c.height = i;
+    const g = c.getContext("2d", { willReadFrequently: !0 }), p = new ImageData(new Uint8ClampedArray(o.data), o.cols, o.rows);
+    return g.putImageData(p, 0, 0), c;
   } catch (a) {
     console.warn("[Resize] OpenCV resizing failed. Falling back to native canvas context scaling:", a);
     try {
-      const { width: s, height: l } = e;
-      let c = s, h = l;
-      c > t && (h = Math.round(h * t / c), c = t), h > n && (c = Math.round(c * n / h), h = n);
-      const m = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(c, h) : document.createElement("canvas");
-      m.width = c, m.height = h;
-      const i = m.getContext("2d");
-      return i.imageSmoothingEnabled = !0, i.imageSmoothingQuality = "high", i.drawImage(e, 0, 0, c, h), m;
-    } catch (s) {
-      return console.error("[Resize] Native canvas resizing fallback failed. Returning original image.", s), e;
+      const { width: i, height: s } = e;
+      let u = i, h = s;
+      u > t && (h = Math.round(h * t / u), u = t), h > n && (u = Math.round(u * n / h), h = n);
+      const m = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(u, h) : document.createElement("canvas");
+      m.width = u, m.height = h;
+      const c = m.getContext("2d", { willReadFrequently: !0 });
+      return c.imageSmoothingEnabled = !0, c.imageSmoothingQuality = "high", c.drawImage(e, 0, 0, u, h), m;
+    } catch (i) {
+      return console.error("[Resize] Native canvas resizing fallback failed. Returning original image.", i), e;
     }
   } finally {
     r && r.delete(), o && o.delete();
   }
 }
-async function Te(e) {
+async function Oe(e) {
   if (!e)
     throw new TypeError("Canvas parameter is required");
   let t = null, n = null, r = null;
   try {
     if (typeof cv > "u" || !cv.cvtColor)
       throw new Error("OpenCV.js runtime is not loaded");
-    const a = e.getContext("2d").getImageData(0, 0, e.width, e.height);
+    const a = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height);
     t = cv.matFromImageData(a), n = new cv.Mat(), cv.cvtColor(t, n, cv.COLOR_RGBA2GRAY), r = new cv.Mat(), cv.cvtColor(n, r, cv.COLOR_GRAY2RGBA);
-    const s = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-    s.width = e.width, s.height = e.height;
-    const l = s.getContext("2d"), c = new ImageData(new Uint8ClampedArray(r.data), r.cols, r.rows);
-    return l.putImageData(c, 0, 0), s;
+    const i = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
+    i.width = e.width, i.height = e.height;
+    const s = i.getContext("2d", { willReadFrequently: !0 }), u = new ImageData(new Uint8ClampedArray(r.data), r.cols, r.rows);
+    return s.putImageData(u, 0, 0), i;
   } catch (o) {
     console.warn("[Grayscale] OpenCV conversion failed. Falling back to native JS luminosity conversions:", o);
     try {
-      const s = e.getContext("2d").getImageData(0, 0, e.width, e.height), l = s.data;
-      for (let h = 0; h < l.length; h += 4) {
-        const m = l[h], i = l[h + 1], f = l[h + 2], p = Math.round(0.299 * m + 0.587 * i + 0.114 * f);
-        l[h] = p, l[h + 1] = p, l[h + 2] = p;
+      const i = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height), s = i.data;
+      for (let h = 0; h < s.length; h += 4) {
+        const m = s[h], c = s[h + 1], g = s[h + 2], p = Math.round(0.299 * m + 0.587 * c + 0.114 * g);
+        s[h] = p, s[h + 1] = p, s[h + 2] = p;
       }
-      const c = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-      return c.width = e.width, c.height = e.height, c.getContext("2d").putImageData(s, 0, 0), c;
+      const u = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
+      return u.width = e.width, u.height = e.height, u.getContext("2d", { willReadFrequently: !0 }).putImageData(i, 0, 0), u;
     } catch (a) {
       return console.error("[Grayscale] JS grayscale fallback failed. Returning original image.", a), e;
     }
@@ -81,63 +81,63 @@ async function De(e) {
   try {
     if (typeof cv > "u" || !cv.GaussianBlur)
       throw new Error("OpenCV.js runtime is not loaded");
-    const o = e.getContext("2d").getImageData(0, 0, e.width, e.height);
+    const o = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height);
     t = cv.matFromImageData(o), n = new cv.Mat();
     const a = new cv.Size(3, 3);
     cv.GaussianBlur(t, n, a, 0, 0, cv.BORDER_DEFAULT);
-    const s = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-    s.width = e.width, s.height = e.height;
-    const l = s.getContext("2d"), c = new ImageData(new Uint8ClampedArray(n.data), n.cols, n.rows);
-    return l.putImageData(c, 0, 0), s;
+    const i = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
+    i.width = e.width, i.height = e.height;
+    const s = i.getContext("2d", { willReadFrequently: !0 }), u = new ImageData(new Uint8ClampedArray(n.data), n.cols, n.rows);
+    return s.putImageData(u, 0, 0), i;
   } catch (r) {
     return console.warn("[Denoise] Denoising failed. Skipping this stage and returning original canvas:", r), e;
   } finally {
     t && t.delete(), n && n.delete();
   }
 }
-async function Oe(e) {
+async function Te(e) {
   if (!e)
     throw new TypeError("Canvas parameter is required");
-  let t = null, n = null, r = null, o = null, a = null, s = null;
+  let t = null, n = null, r = null, o = null, a = null, i = null;
   try {
     if (typeof cv > "u" || !cv.HoughLinesP)
       throw new Error("OpenCV.js runtime is not loaded");
-    const c = e.getContext("2d").getImageData(0, 0, e.width, e.height);
-    t = cv.matFromImageData(c), n = new cv.Mat(), r = new cv.Mat(), o = new cv.Mat(), cv.cvtColor(t, n, cv.COLOR_RGBA2GRAY), cv.Canny(n, r, 50, 200, 3), cv.HoughLinesP(r, o, 1, Math.PI / 180, 100, 50, 10);
+    const u = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height);
+    t = cv.matFromImageData(u), n = new cv.Mat(), r = new cv.Mat(), o = new cv.Mat(), cv.cvtColor(t, n, cv.COLOR_RGBA2GRAY), cv.Canny(n, r, 50, 200, 3), cv.HoughLinesP(r, o, 1, Math.PI / 180, 100, 50, 10);
     let h = 0, m = 0;
-    for (let C = 0; C < o.rows; ++C) {
-      const v = o.data32S[C * 4], k = o.data32S[C * 4 + 1], T = o.data32S[C * 4 + 2], D = o.data32S[C * 4 + 3], R = Math.atan2(D - k, T - v) * (180 / Math.PI);
-      R > -45 && R < 45 && (h += R, m++);
+    for (let x = 0; x < o.rows; ++x) {
+      const v = o.data32S[x * 4], M = o.data32S[x * 4 + 1], R = o.data32S[x * 4 + 2], O = o.data32S[x * 4 + 3], T = Math.atan2(O - M, R - v) * (180 / Math.PI);
+      T > -45 && T < 45 && (h += T, m++);
     }
     if (m < 3)
       return console.log("[Deskew] Insufficient line segments detected. Skipping deskew."), { canvas: e, angle: 0 };
-    const i = h / m;
-    if (Math.abs(i) < 0.5)
-      return console.log(`[Deskew] Skew angle is negligible (${i.toFixed(2)} deg). Skipping rotation.`), { canvas: e, angle: 0 };
-    console.log(`[Deskew] Correcting skew angle: ${i.toFixed(2)} degrees`);
-    const f = new cv.Point(e.width / 2, e.height / 2);
-    s = cv.getRotationMatrix2D(f, i, 1), a = new cv.Mat();
+    const c = h / m;
+    if (Math.abs(c) < 0.5)
+      return console.log(`[Deskew] Skew angle is negligible (${c.toFixed(2)} deg). Skipping rotation.`), { canvas: e, angle: 0 };
+    console.log(`[Deskew] Correcting skew angle: ${c.toFixed(2)} degrees`);
+    const g = new cv.Point(e.width / 2, e.height / 2);
+    i = cv.getRotationMatrix2D(g, c, 1), a = new cv.Mat();
     const p = new cv.Size(e.width, e.height);
-    cv.warpAffine(t, a, s, p, cv.INTER_CUBIC, cv.BORDER_REPLICATE);
-    const I = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-    I.width = e.width, I.height = e.height;
-    const A = I.getContext("2d"), S = new ImageData(new Uint8ClampedArray(a.data), a.cols, a.rows);
-    return A.putImageData(S, 0, 0), { canvas: I, angle: i };
-  } catch (l) {
-    return console.warn("[Deskew] Hough deskewing failed. Skipping this stage and returning original canvas:", l), { canvas: e, angle: 0 };
+    cv.warpAffine(t, a, i, p, cv.INTER_CUBIC, cv.BORDER_REPLICATE);
+    const E = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
+    E.width = e.width, E.height = e.height;
+    const A = E.getContext("2d", { willReadFrequently: !0 }), S = new ImageData(new Uint8ClampedArray(a.data), a.cols, a.rows);
+    return A.putImageData(S, 0, 0), { canvas: E, angle: c };
+  } catch (s) {
+    return console.warn("[Deskew] Hough deskewing failed. Skipping this stage and returning original canvas:", s), { canvas: e, angle: 0 };
   } finally {
-    t && t.delete(), n && n.delete(), r && r.delete(), o && o.delete(), a && a.delete(), s && s.delete();
+    t && t.delete(), n && n.delete(), r && r.delete(), o && o.delete(), a && a.delete(), i && i.delete();
   }
 }
-async function Re(e, t = 127) {
+async function Pe(e, t = 127) {
   if (!e)
     throw new TypeError("Canvas parameter is required");
   let n = null, r = null, o = null, a = null;
   try {
     if (typeof cv > "u" || !cv.adaptiveThreshold)
       throw new Error("OpenCV.js runtime is not loaded");
-    const l = e.getContext("2d").getImageData(0, 0, e.width, e.height);
-    n = cv.matFromImageData(l), r = new cv.Mat(), cv.cvtColor(n, r, cv.COLOR_RGBA2GRAY), o = new cv.Mat(), cv.adaptiveThreshold(
+    const s = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height);
+    n = cv.matFromImageData(s), r = new cv.Mat(), cv.cvtColor(n, r, cv.COLOR_RGBA2GRAY), o = new cv.Mat(), cv.adaptiveThreshold(
       r,
       o,
       255,
@@ -146,256 +146,220 @@ async function Re(e, t = 127) {
       11,
       2
     ), a = new cv.Mat(), cv.cvtColor(o, a, cv.COLOR_GRAY2RGBA);
-    const c = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-    c.width = e.width, c.height = e.height;
-    const h = c.getContext("2d"), m = new ImageData(new Uint8ClampedArray(a.data), a.cols, a.rows);
-    return h.putImageData(m, 0, 0), c;
-  } catch (s) {
-    console.warn("[Threshold] OpenCV adaptive thresholding failed. Falling back to grayscale image:", s);
+    const u = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
+    u.width = e.width, u.height = e.height;
+    const h = u.getContext("2d", { willReadFrequently: !0 }), m = new ImageData(new Uint8ClampedArray(a.data), a.cols, a.rows);
+    return h.putImageData(m, 0, 0), u;
+  } catch (i) {
+    console.warn("[Threshold] OpenCV adaptive thresholding failed. Falling back to grayscale image:", i);
     try {
-      return await Pe(e);
-    } catch (l) {
-      return console.error("[Threshold] Grayscale fallback failed. Returning original canvas.", l), e;
+      return await _e(e);
+    } catch (s) {
+      return console.error("[Threshold] Grayscale fallback failed. Returning original canvas.", s), e;
     }
   } finally {
     n && n.delete(), r && r.delete(), o && o.delete(), a && a.delete();
   }
 }
-async function Pe(e) {
-  const n = e.getContext("2d").getImageData(0, 0, e.width, e.height), r = n.data;
+async function _e(e) {
+  const n = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height), r = n.data;
   for (let a = 0; a < r.length; a += 4) {
-    const s = Math.round(0.299 * r[a] + 0.587 * r[a + 1] + 0.114 * r[a + 2]);
-    r[a] = s, r[a + 1] = s, r[a + 2] = s;
+    const i = Math.round(0.299 * r[a] + 0.587 * r[a + 1] + 0.114 * r[a + 2]);
+    r[a] = i, r[a + 1] = i, r[a + 2] = i;
   }
   const o = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-  return o.width = e.width, o.height = e.height, o.getContext("2d").putImageData(n, 0, 0), o;
+  return o.width = e.width, o.height = e.height, o.getContext("2d", { willReadFrequently: !0 }).putImageData(n, 0, 0), o;
 }
 let J = null;
-async function _e() {
+async function Le() {
   if (typeof chrome > "u" || !chrome.offscreen)
     return;
   const e = "public/offscreen.html";
-  if (!(chrome.runtime.getContexts && (await chrome.runtime.getContexts({
+  let t = !1;
+  if (chrome.runtime.getContexts && (t = (await chrome.runtime.getContexts({
     contextTypes: ["OFFSCREEN_DOCUMENT"],
     documentUrls: [chrome.runtime.getURL(e)]
-  })).length > 0)) {
-    if (J) {
-      await J;
-      return;
-    }
-    J = chrome.offscreen.createDocument({
-      url: e,
-      reasons: ["DOM_SCRAPING"],
-      justification: "OpenCV image preprocessing requires canvas DOM context"
-    });
+  })).length > 0), t) {
     try {
-      await J;
-    } catch (t) {
-      if (!t.message.includes("Only a single offscreen"))
-        throw t;
-    } finally {
-      J = null;
+      if (await new Promise((r) => {
+        const o = setTimeout(() => r(!1), 1e3);
+        chrome.runtime.sendMessage({ target: "offscreen", type: "PING" }, (a) => {
+          clearTimeout(o), r(a && a.from === "offscreen");
+        });
+      }))
+        return;
+    } catch {
+    }
+    console.warn("[OffscreenManager] Offscreen document unresponsive. Recreating...");
+    try {
+      await chrome.offscreen.closeDocument();
+    } catch {
     }
   }
+  if (J) {
+    await J;
+    return;
+  }
+  J = chrome.offscreen.createDocument({
+    url: e,
+    reasons: ["DOM_SCRAPING"],
+    justification: "OpenCV image preprocessing requires canvas DOM context"
+  });
+  try {
+    await J;
+  } catch (n) {
+    if (!n.message.includes("Only a single offscreen"))
+      throw n;
+  } finally {
+    J = null;
+  }
 }
-async function ve(e, t, n = 15e3) {
-  await _e();
-  const r = (o = 3) => new Promise((a, s) => {
-    let l = setTimeout(() => {
-      s(new Error(`Offscreen execution timed out after ${n}ms`));
+async function Be(e, t, n = 15e3) {
+  await Le();
+  const r = (o = 3) => new Promise((a, i) => {
+    let s = setTimeout(() => {
+      i(new Error(`Offscreen execution timed out after ${n}ms`));
     }, n);
     console.log("========= BEFORE SENDMESSAGE ========="), console.log(t), console.log(t.data?.constructor?.name), console.log(t.data?.byteLength), console.log("======================================"), chrome.runtime.sendMessage({
       target: "offscreen",
       type: e,
       payload: t
-    }, (c) => {
-      if (clearTimeout(l), chrome.runtime.lastError) {
+    }, (u) => {
+      if (clearTimeout(s), chrome.runtime.lastError) {
         const h = chrome.runtime.lastError.message;
         if (h.includes("Could not establish connection") && o > 0) {
           console.warn(`[OffscreenManager] Connection failed (${h}). Retrying in 100ms... (${o} retries left)`), setTimeout(() => {
-            r(o - 1).then(a, s);
+            r(o - 1).then(a, i);
           }, 100);
           return;
         }
-        return s(new Error(h));
+        return i(new Error(h));
       }
-      if (!c)
-        return s(new Error("No response received from offscreen document"));
-      if (!c.success)
-        return s(new Error(c.error || "Offscreen processing failed"));
-      a(c.payload);
+      if (!u)
+        return i(new Error("No response received from offscreen document"));
+      if (!u.success)
+        return i(new Error(u.error || "Offscreen processing failed"));
+      a(u.payload);
     });
   });
   return r();
 }
-async function xe(e, t = {}) {
-  if (typeof document > "u" && typeof chrome < "u" && chrome.offscreen) {
-    console.log("[Preprocessor] Running in Service Worker. Delegating OpenCV to Offscreen Document...");
-    try {
-      const m = e.getContext("2d").getImageData(0, 0, e.width, e.height);
-      console.log({
-        width: e.width,
-        height: e.height,
-        imageDataLength: m.data.length,
-        byteLength: m.data.buffer.byteLength
-      });
-      const i = Array.from(m.data), f = await ve("PREPROCESS_IMAGE", {
-        width: e.width,
-        height: e.height,
-        data: i,
-        options: t
-      });
-      console.log("===== RESULT FROM OFFSCREEN ====="), console.log(f), console.log("data =", f?.data), console.log("constructor =", f?.data?.constructor?.name), console.log("length =", f?.data?.length);
-      const p = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(f.width, f.height) : document.createElement("canvas");
-      p.width = f.width, p.height = f.height;
-      const I = p.getContext("2d"), A = new ImageData(new Uint8ClampedArray(f.data), f.width, f.height);
-      return I.putImageData(A, 0, 0), p;
-    } catch (h) {
-      return console.error("[Preprocessor] Offscreen delegation failed. Returning original imageSource.", h), e;
-    }
-  }
+async function Ce(e, t = {}) {
+  if (typeof document > "u" && typeof chrome < "u" && chrome.offscreen)
+    return e;
   const {
-    enableDenoise: n = !0,
+    enableDenoise: n = !1,
+    // ID cards ke liye false rakha hai
     enableDeskew: r = !0,
-    thresholdValue: o = 127,
+    thresholdValue: o = 0,
+    // 0 = Skip thresholding to preserve edges
     maxWidth: a = 1920,
-    maxHeight: s = 1080
+    maxHeight: i = 1080
   } = t;
-  console.log("[Preprocessor] Beginning OpenCV.js image preprocessing pipeline...");
-  const l = Date.now();
-  let c = e;
+  console.log("[Preprocessor] Beginning Safe-Mode pipeline...");
+  let s = e;
   try {
-    try {
-      c = await Me(c, a, s);
-    } catch (i) {
-      console.warn("[Preprocessor] Resize stage failed. Continuing...", i);
-    }
-    try {
-      c = await Te(c);
-    } catch (i) {
-      console.warn("[Preprocessor] Grayscale stage failed. Continuing...", i);
-    }
-    if (n)
-      try {
-        c = await De(c);
-      } catch (i) {
-        console.warn("[Preprocessor] Denoise stage failed. Continuing...", i);
-      }
-    let h = 0;
-    if (r)
-      try {
-        const i = await Oe(c);
-        c = i.canvas, h = i.angle;
-      } catch (i) {
-        console.warn("[Preprocessor] Deskew stage failed. Continuing...", i);
-      }
-    try {
-      c = await Re(c, o);
-    } catch (i) {
-      console.warn("[Preprocessor] Threshold binarization stage failed. Continuing...", i);
-    }
-    const m = Date.now() - l;
-    return console.log(`[Preprocessor] Pipeline resolved successfully in ${m}ms. Skew Angle: ${h.toFixed(2)} deg.`), c;
-  } catch (h) {
-    return console.error("[Preprocessor] Critical pipeline failure. Returning original image.", h), e;
+    return s = await Ae(s, a, i), s = await Oe(s), n && (s = await De(s)), r && (s = (await Te(s)).canvas), o > 0 && (s = await Pe(s, o)), s;
+  } catch (u) {
+    return console.error("[Preprocessor] Pipeline failure, returning raw.", u), e;
   }
 }
-var Le = { exports: {} };
+var Fe = { exports: {} };
 (function(e) {
   var t = function(n) {
-    var r = Object.prototype, o = r.hasOwnProperty, a = Object.defineProperty || function(d, u, g) {
-      d[u] = g.value;
-    }, s, l = typeof Symbol == "function" ? Symbol : {}, c = l.iterator || "@@iterator", h = l.asyncIterator || "@@asyncIterator", m = l.toStringTag || "@@toStringTag";
-    function i(d, u, g) {
-      return Object.defineProperty(d, u, {
-        value: g,
+    var r = Object.prototype, o = r.hasOwnProperty, a = Object.defineProperty || function(d, l, f) {
+      d[l] = f.value;
+    }, i, s = typeof Symbol == "function" ? Symbol : {}, u = s.iterator || "@@iterator", h = s.asyncIterator || "@@asyncIterator", m = s.toStringTag || "@@toStringTag";
+    function c(d, l, f) {
+      return Object.defineProperty(d, l, {
+        value: f,
         enumerable: !0,
         configurable: !0,
         writable: !0
-      }), d[u];
+      }), d[l];
     }
     try {
-      i({}, "");
+      c({}, "");
     } catch {
-      i = function(u, g, y) {
-        return u[g] = y;
+      c = function(l, f, y) {
+        return l[f] = y;
       };
     }
-    function f(d, u, g, y) {
-      var w = u && u.prototype instanceof k ? u : k, E = Object.create(w.prototype), L = new V(y || []);
-      return a(E, "_invoke", { value: oe(d, g, L) }), E;
+    function g(d, l, f, y) {
+      var w = l && l.prototype instanceof M ? l : M, I = Object.create(w.prototype), L = new V(y || []);
+      return a(I, "_invoke", { value: ae(d, f, L) }), I;
     }
-    n.wrap = f;
-    function p(d, u, g) {
+    n.wrap = g;
+    function p(d, l, f) {
       try {
-        return { type: "normal", arg: d.call(u, g) };
+        return { type: "normal", arg: d.call(l, f) };
       } catch (y) {
         return { type: "throw", arg: y };
       }
     }
-    var I = "suspendedStart", A = "suspendedYield", S = "executing", C = "completed", v = {};
-    function k() {
+    var E = "suspendedStart", A = "suspendedYield", S = "executing", x = "completed", v = {};
+    function M() {
     }
-    function T() {
+    function R() {
     }
-    function D() {
+    function O() {
     }
-    var R = {};
-    i(R, c, function() {
+    var T = {};
+    c(T, u, function() {
       return this;
     });
-    var N = Object.getPrototypeOf, P = N && N(N(x([])));
-    P && P !== r && o.call(P, c) && (R = P);
-    var O = D.prototype = k.prototype = Object.create(R);
-    T.prototype = D, a(O, "constructor", { value: D, configurable: !0 }), a(
-      D,
+    var $ = Object.getPrototypeOf, P = $ && $($(b([])));
+    P && P !== r && o.call(P, u) && (T = P);
+    var D = O.prototype = M.prototype = Object.create(T);
+    R.prototype = O, a(D, "constructor", { value: O, configurable: !0 }), a(
+      O,
       "constructor",
-      { value: T, configurable: !0 }
-    ), T.displayName = i(
-      D,
+      { value: R, configurable: !0 }
+    ), R.displayName = c(
+      O,
       m,
       "GeneratorFunction"
     );
     function _(d) {
-      ["next", "throw", "return"].forEach(function(u) {
-        i(d, u, function(g) {
-          return this._invoke(u, g);
+      ["next", "throw", "return"].forEach(function(l) {
+        c(d, l, function(f) {
+          return this._invoke(l, f);
         });
       });
     }
     n.isGeneratorFunction = function(d) {
-      var u = typeof d == "function" && d.constructor;
-      return u ? u === T || // For the native GeneratorFunction constructor, the best we can
+      var l = typeof d == "function" && d.constructor;
+      return l ? l === R || // For the native GeneratorFunction constructor, the best we can
       // do is to check its .name property.
-      (u.displayName || u.name) === "GeneratorFunction" : !1;
+      (l.displayName || l.name) === "GeneratorFunction" : !1;
     }, n.mark = function(d) {
-      return Object.setPrototypeOf ? Object.setPrototypeOf(d, D) : (d.__proto__ = D, i(d, m, "GeneratorFunction")), d.prototype = Object.create(O), d;
+      return Object.setPrototypeOf ? Object.setPrototypeOf(d, O) : (d.__proto__ = O, c(d, m, "GeneratorFunction")), d.prototype = Object.create(D), d;
     }, n.awrap = function(d) {
       return { __await: d };
     };
-    function j(d, u) {
-      function g(E, L, F, G) {
-        var z = p(d[E], d, L);
-        if (z.type === "throw")
-          G(z.arg);
+    function Z(d, l) {
+      function f(I, L, N, z) {
+        var q = p(d[I], d, L);
+        if (q.type === "throw")
+          z(q.arg);
         else {
-          var se = z.arg, K = se.value;
-          return K && typeof K == "object" && o.call(K, "__await") ? u.resolve(K.__await).then(function(H) {
-            g("next", H, F, G);
-          }, function(H) {
-            g("throw", H, F, G);
-          }) : u.resolve(K).then(function(H) {
-            se.value = H, F(se);
-          }, function(H) {
-            return g("throw", H, F, G);
+          var se = q.arg, K = se.value;
+          return K && typeof K == "object" && o.call(K, "__await") ? l.resolve(K.__await).then(function(j) {
+            f("next", j, N, z);
+          }, function(j) {
+            f("throw", j, N, z);
+          }) : l.resolve(K).then(function(j) {
+            se.value = j, N(se);
+          }, function(j) {
+            return f("throw", j, N, z);
           });
         }
       }
       var y;
-      function w(E, L) {
-        function F() {
-          return new u(function(G, z) {
-            g(E, L, G, z);
+      function w(I, L) {
+        function N() {
+          return new l(function(z, q) {
+            f(I, L, z, q);
           });
         }
         return y = // If enqueue has been called before, then we want to wait until
@@ -411,222 +375,222 @@ var Le = { exports: {} };
         // async functions in terms of async generators, it is especially
         // important to get this right, even though it requires care.
         y ? y.then(
-          F,
+          N,
           // Avoid propagating failures to Promises returned by later
           // invocations of the iterator.
-          F
-        ) : F();
+          N
+        ) : N();
       }
       a(this, "_invoke", { value: w });
     }
-    _(j.prototype), i(j.prototype, h, function() {
+    _(Z.prototype), c(Z.prototype, h, function() {
       return this;
-    }), n.AsyncIterator = j, n.async = function(d, u, g, y, w) {
+    }), n.AsyncIterator = Z, n.async = function(d, l, f, y, w) {
       w === void 0 && (w = Promise);
-      var E = new j(
-        f(d, u, g, y),
+      var I = new Z(
+        g(d, l, f, y),
         w
       );
-      return n.isGeneratorFunction(u) ? E : E.next().then(function(L) {
-        return L.done ? L.value : E.next();
+      return n.isGeneratorFunction(l) ? I : I.next().then(function(L) {
+        return L.done ? L.value : I.next();
       });
     };
-    function oe(d, u, g) {
-      var y = I;
-      return function(E, L) {
+    function ae(d, l, f) {
+      var y = E;
+      return function(I, L) {
         if (y === S)
           throw new Error("Generator is already running");
-        if (y === C) {
-          if (E === "throw")
+        if (y === x) {
+          if (I === "throw")
             throw L;
-          return b();
+          return C();
         }
-        for (g.method = E, g.arg = L; ; ) {
-          var F = g.delegate;
-          if (F) {
-            var G = Q(F, g);
-            if (G) {
-              if (G === v) continue;
-              return G;
+        for (f.method = I, f.arg = L; ; ) {
+          var N = f.delegate;
+          if (N) {
+            var z = Q(N, f);
+            if (z) {
+              if (z === v) continue;
+              return z;
             }
           }
-          if (g.method === "next")
-            g.sent = g._sent = g.arg;
-          else if (g.method === "throw") {
-            if (y === I)
-              throw y = C, g.arg;
-            g.dispatchException(g.arg);
-          } else g.method === "return" && g.abrupt("return", g.arg);
+          if (f.method === "next")
+            f.sent = f._sent = f.arg;
+          else if (f.method === "throw") {
+            if (y === E)
+              throw y = x, f.arg;
+            f.dispatchException(f.arg);
+          } else f.method === "return" && f.abrupt("return", f.arg);
           y = S;
-          var z = p(d, u, g);
-          if (z.type === "normal") {
-            if (y = g.done ? C : A, z.arg === v)
+          var q = p(d, l, f);
+          if (q.type === "normal") {
+            if (y = f.done ? x : A, q.arg === v)
               continue;
             return {
-              value: z.arg,
-              done: g.done
+              value: q.arg,
+              done: f.done
             };
-          } else z.type === "throw" && (y = C, g.method = "throw", g.arg = z.arg);
+          } else q.type === "throw" && (y = x, f.method = "throw", f.arg = q.arg);
         }
       };
     }
-    function Q(d, u) {
-      var g = u.method, y = d.iterator[g];
-      if (y === s)
-        return u.delegate = null, g === "throw" && d.iterator.return && (u.method = "return", u.arg = s, Q(d, u), u.method === "throw") || g !== "return" && (u.method = "throw", u.arg = new TypeError(
-          "The iterator does not provide a '" + g + "' method"
+    function Q(d, l) {
+      var f = l.method, y = d.iterator[f];
+      if (y === i)
+        return l.delegate = null, f === "throw" && d.iterator.return && (l.method = "return", l.arg = i, Q(d, l), l.method === "throw") || f !== "return" && (l.method = "throw", l.arg = new TypeError(
+          "The iterator does not provide a '" + f + "' method"
         )), v;
-      var w = p(y, d.iterator, u.arg);
+      var w = p(y, d.iterator, l.arg);
       if (w.type === "throw")
-        return u.method = "throw", u.arg = w.arg, u.delegate = null, v;
-      var E = w.arg;
-      if (!E)
-        return u.method = "throw", u.arg = new TypeError("iterator result is not an object"), u.delegate = null, v;
-      if (E.done)
-        u[d.resultName] = E.value, u.next = d.nextLoc, u.method !== "return" && (u.method = "next", u.arg = s);
+        return l.method = "throw", l.arg = w.arg, l.delegate = null, v;
+      var I = w.arg;
+      if (!I)
+        return l.method = "throw", l.arg = new TypeError("iterator result is not an object"), l.delegate = null, v;
+      if (I.done)
+        l[d.resultName] = I.value, l.next = d.nextLoc, l.method !== "return" && (l.method = "next", l.arg = i);
       else
-        return E;
-      return u.delegate = null, v;
+        return I;
+      return l.delegate = null, v;
     }
-    _(O), i(O, m, "Generator"), i(O, c, function() {
+    _(D), c(D, m, "Generator"), c(D, u, function() {
       return this;
-    }), i(O, "toString", function() {
+    }), c(D, "toString", function() {
       return "[object Generator]";
     });
-    function ae(d) {
-      var u = { tryLoc: d[0] };
-      1 in d && (u.catchLoc = d[1]), 2 in d && (u.finallyLoc = d[2], u.afterLoc = d[3]), this.tryEntries.push(u);
+    function ie(d) {
+      var l = { tryLoc: d[0] };
+      1 in d && (l.catchLoc = d[1]), 2 in d && (l.finallyLoc = d[2], l.afterLoc = d[3]), this.tryEntries.push(l);
     }
-    function Z(d) {
-      var u = d.completion || {};
-      u.type = "normal", delete u.arg, d.completion = u;
+    function H(d) {
+      var l = d.completion || {};
+      l.type = "normal", delete l.arg, d.completion = l;
     }
     function V(d) {
-      this.tryEntries = [{ tryLoc: "root" }], d.forEach(ae, this), this.reset(!0);
+      this.tryEntries = [{ tryLoc: "root" }], d.forEach(ie, this), this.reset(!0);
     }
     n.keys = function(d) {
-      var u = Object(d), g = [];
-      for (var y in u)
-        g.push(y);
-      return g.reverse(), function w() {
-        for (; g.length; ) {
-          var E = g.pop();
-          if (E in u)
-            return w.value = E, w.done = !1, w;
+      var l = Object(d), f = [];
+      for (var y in l)
+        f.push(y);
+      return f.reverse(), function w() {
+        for (; f.length; ) {
+          var I = f.pop();
+          if (I in l)
+            return w.value = I, w.done = !1, w;
         }
         return w.done = !0, w;
       };
     };
-    function x(d) {
+    function b(d) {
       if (d) {
-        var u = d[c];
-        if (u)
-          return u.call(d);
+        var l = d[u];
+        if (l)
+          return l.call(d);
         if (typeof d.next == "function")
           return d;
         if (!isNaN(d.length)) {
-          var g = -1, y = function w() {
-            for (; ++g < d.length; )
-              if (o.call(d, g))
-                return w.value = d[g], w.done = !1, w;
-            return w.value = s, w.done = !0, w;
+          var f = -1, y = function w() {
+            for (; ++f < d.length; )
+              if (o.call(d, f))
+                return w.value = d[f], w.done = !1, w;
+            return w.value = i, w.done = !0, w;
           };
           return y.next = y;
         }
       }
-      return { next: b };
+      return { next: C };
     }
-    n.values = x;
-    function b() {
-      return { value: s, done: !0 };
+    n.values = b;
+    function C() {
+      return { value: i, done: !0 };
     }
     return V.prototype = {
       constructor: V,
       reset: function(d) {
-        if (this.prev = 0, this.next = 0, this.sent = this._sent = s, this.done = !1, this.delegate = null, this.method = "next", this.arg = s, this.tryEntries.forEach(Z), !d)
-          for (var u in this)
-            u.charAt(0) === "t" && o.call(this, u) && !isNaN(+u.slice(1)) && (this[u] = s);
+        if (this.prev = 0, this.next = 0, this.sent = this._sent = i, this.done = !1, this.delegate = null, this.method = "next", this.arg = i, this.tryEntries.forEach(H), !d)
+          for (var l in this)
+            l.charAt(0) === "t" && o.call(this, l) && !isNaN(+l.slice(1)) && (this[l] = i);
       },
       stop: function() {
         this.done = !0;
-        var d = this.tryEntries[0], u = d.completion;
-        if (u.type === "throw")
-          throw u.arg;
+        var d = this.tryEntries[0], l = d.completion;
+        if (l.type === "throw")
+          throw l.arg;
         return this.rval;
       },
       dispatchException: function(d) {
         if (this.done)
           throw d;
-        var u = this;
-        function g(G, z) {
-          return E.type = "throw", E.arg = d, u.next = G, z && (u.method = "next", u.arg = s), !!z;
+        var l = this;
+        function f(z, q) {
+          return I.type = "throw", I.arg = d, l.next = z, q && (l.method = "next", l.arg = i), !!q;
         }
         for (var y = this.tryEntries.length - 1; y >= 0; --y) {
-          var w = this.tryEntries[y], E = w.completion;
+          var w = this.tryEntries[y], I = w.completion;
           if (w.tryLoc === "root")
-            return g("end");
+            return f("end");
           if (w.tryLoc <= this.prev) {
-            var L = o.call(w, "catchLoc"), F = o.call(w, "finallyLoc");
-            if (L && F) {
+            var L = o.call(w, "catchLoc"), N = o.call(w, "finallyLoc");
+            if (L && N) {
               if (this.prev < w.catchLoc)
-                return g(w.catchLoc, !0);
+                return f(w.catchLoc, !0);
               if (this.prev < w.finallyLoc)
-                return g(w.finallyLoc);
+                return f(w.finallyLoc);
             } else if (L) {
               if (this.prev < w.catchLoc)
-                return g(w.catchLoc, !0);
-            } else if (F) {
+                return f(w.catchLoc, !0);
+            } else if (N) {
               if (this.prev < w.finallyLoc)
-                return g(w.finallyLoc);
+                return f(w.finallyLoc);
             } else
               throw new Error("try statement without catch or finally");
           }
         }
       },
-      abrupt: function(d, u) {
-        for (var g = this.tryEntries.length - 1; g >= 0; --g) {
-          var y = this.tryEntries[g];
+      abrupt: function(d, l) {
+        for (var f = this.tryEntries.length - 1; f >= 0; --f) {
+          var y = this.tryEntries[f];
           if (y.tryLoc <= this.prev && o.call(y, "finallyLoc") && this.prev < y.finallyLoc) {
             var w = y;
             break;
           }
         }
-        w && (d === "break" || d === "continue") && w.tryLoc <= u && u <= w.finallyLoc && (w = null);
-        var E = w ? w.completion : {};
-        return E.type = d, E.arg = u, w ? (this.method = "next", this.next = w.finallyLoc, v) : this.complete(E);
+        w && (d === "break" || d === "continue") && w.tryLoc <= l && l <= w.finallyLoc && (w = null);
+        var I = w ? w.completion : {};
+        return I.type = d, I.arg = l, w ? (this.method = "next", this.next = w.finallyLoc, v) : this.complete(I);
       },
-      complete: function(d, u) {
+      complete: function(d, l) {
         if (d.type === "throw")
           throw d.arg;
-        return d.type === "break" || d.type === "continue" ? this.next = d.arg : d.type === "return" ? (this.rval = this.arg = d.arg, this.method = "return", this.next = "end") : d.type === "normal" && u && (this.next = u), v;
+        return d.type === "break" || d.type === "continue" ? this.next = d.arg : d.type === "return" ? (this.rval = this.arg = d.arg, this.method = "return", this.next = "end") : d.type === "normal" && l && (this.next = l), v;
       },
       finish: function(d) {
-        for (var u = this.tryEntries.length - 1; u >= 0; --u) {
-          var g = this.tryEntries[u];
-          if (g.finallyLoc === d)
-            return this.complete(g.completion, g.afterLoc), Z(g), v;
+        for (var l = this.tryEntries.length - 1; l >= 0; --l) {
+          var f = this.tryEntries[l];
+          if (f.finallyLoc === d)
+            return this.complete(f.completion, f.afterLoc), H(f), v;
         }
       },
       catch: function(d) {
-        for (var u = this.tryEntries.length - 1; u >= 0; --u) {
-          var g = this.tryEntries[u];
-          if (g.tryLoc === d) {
-            var y = g.completion;
+        for (var l = this.tryEntries.length - 1; l >= 0; --l) {
+          var f = this.tryEntries[l];
+          if (f.tryLoc === d) {
+            var y = f.completion;
             if (y.type === "throw") {
               var w = y.arg;
-              Z(g);
+              H(f);
             }
             return w;
           }
         }
         throw new Error("illegal catch attempt");
       },
-      delegateYield: function(d, u, g) {
+      delegateYield: function(d, l, f) {
         return this.delegate = {
-          iterator: x(d),
-          resultName: u,
-          nextLoc: g
-        }, this.method === "next" && (this.arg = s), v;
+          iterator: b(d),
+          resultName: l,
+          nextLoc: f
+        }, this.method === "next" && (this.arg = i), v;
       }
     }, n;
   }(
@@ -641,51 +605,51 @@ var Le = { exports: {} };
   } catch {
     typeof globalThis == "object" ? globalThis.regeneratorRuntime = t : Function("r", "regeneratorRuntime = r")(t);
   }
-})(Le);
-var Ce = (e, t) => `${e}-${t}-${Math.random().toString(16).slice(3, 8)}`;
-const $e = Ce;
-let de = 0;
-var Be = ({
+})(Fe);
+var Ie = (e, t) => `${e}-${t}-${Math.random().toString(16).slice(3, 8)}`;
+const $e = Ie;
+let fe = 0;
+var Ne = ({
   id: e,
   action: t,
   payload: n = {}
 }) => {
   let r = e;
-  return typeof r > "u" && (r = $e("Job", de), de += 1), {
+  return typeof r > "u" && (r = $e("Job", fe), fe += 1), {
     id: r,
     action: t,
     payload: n
   };
-}, ne = {};
-let ue = !1;
-ne.logging = ue;
-ne.setLogging = (e) => {
-  ue = e;
+}, oe = {};
+let de = !1;
+oe.logging = de;
+oe.setLogging = (e) => {
+  de = e;
 };
-ne.log = (...e) => ue ? console.log.apply(void 0, e) : null;
-function Ne(e) {
+oe.log = (...e) => de ? console.log.apply(void 0, e) : null;
+function qe(e) {
   throw new Error('Could not dynamically require "' + e + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
 }
-var Fe = (e) => {
+var ze = (e) => {
   const t = {};
-  return typeof WorkerGlobalScope < "u" ? t.type = "webworker" : typeof document == "object" ? t.type = "browser" : typeof process == "object" && typeof Ne == "function" && (t.type = "node"), typeof e > "u" ? t : t[e];
+  return typeof WorkerGlobalScope < "u" ? t.type = "webworker" : typeof document == "object" ? t.type = "browser" : typeof process == "object" && typeof qe == "function" && (t.type = "node"), typeof e > "u" ? t : t[e];
 };
-const ze = Fe("type") === "browser", Ge = ze ? (e) => new URL(e, window.location.href).href : (e) => e;
+const Ge = ze("type") === "browser", Ue = Ge ? (e) => new URL(e, window.location.href).href : (e) => e;
 var We = (e) => {
   const t = { ...e };
   return ["corePath", "workerPath", "langPath"].forEach((n) => {
-    e[n] && (t[n] = Ge(t[n]));
+    e[n] && (t[n] = Ue(t[n]));
   }), t;
-}, Ue = {
+}, je = {
   TESSERACT_ONLY: 0,
   LSTM_ONLY: 1,
   TESSERACT_LSTM_COMBINED: 2,
   DEFAULT: 3
 };
-const qe = "7.0.0", He = {
-  version: qe
+const Ye = "7.0.0", Ze = {
+  version: Ye
 };
-var Ye = {
+var He = {
   /*
    * Use BlobURL for worker script by default
    * TODO: remove this option
@@ -695,11 +659,11 @@ var Ye = {
   logger: () => {
   }
 };
-const je = He.version, Ze = Ye;
-var Ve = {
-  ...Ze,
-  workerPath: `https://cdn.jsdelivr.net/npm/tesseract.js@v${je}/dist/worker.min.js`
-}, Ke = ({ workerPath: e, workerBlobURL: t }) => {
+const Ve = Ze.version, Ke = He;
+var Je = {
+  ...Ke,
+  workerPath: `https://cdn.jsdelivr.net/npm/tesseract.js@v${Ve}/dist/worker.min.js`
+}, Xe = ({ workerPath: e, workerBlobURL: t }) => {
   let n;
   if (Blob && URL && t) {
     const r = new Blob([`importScripts("${e}");`], {
@@ -709,337 +673,316 @@ var Ve = {
   } else
     n = new Worker(e);
   return n;
-}, Je = (e) => {
+}, Qe = (e) => {
   e.terminate();
-}, Xe = (e, t) => {
+}, et = (e, t) => {
   e.onmessage = ({ data: n }) => {
     t(n);
   };
-}, Qe = async (e, t) => {
+}, tt = async (e, t) => {
   e.postMessage(t);
 };
-const ie = (e) => new Promise((t, n) => {
+const ce = (e) => new Promise((t, n) => {
   const r = new FileReader();
   r.onload = () => {
     t(r.result);
   }, r.onerror = ({ target: { error: { code: o } } }) => {
     n(Error(`File could not be read! Code=${o}`));
   }, r.readAsArrayBuffer(e);
-}), le = async (e) => {
+}), ue = async (e) => {
   let t = e;
   if (typeof e > "u")
     return "undefined";
   if (typeof e == "string")
     /data:image\/([a-zA-Z]*);base64,([^"]*)/.test(e) ? t = atob(e.split(",")[1]).split("").map((n) => n.charCodeAt(0)) : t = await (await fetch(e)).arrayBuffer();
   else if (typeof HTMLElement < "u" && e instanceof HTMLElement)
-    e.tagName === "IMG" && (t = await le(e.src)), e.tagName === "VIDEO" && (t = await le(e.poster)), e.tagName === "CANVAS" && await new Promise((n) => {
+    e.tagName === "IMG" && (t = await ue(e.src)), e.tagName === "VIDEO" && (t = await ue(e.poster)), e.tagName === "CANVAS" && await new Promise((n) => {
       e.toBlob(async (r) => {
-        t = await ie(r), n();
+        t = await ce(r), n();
       });
     });
   else if (typeof OffscreenCanvas < "u" && e instanceof OffscreenCanvas) {
     const n = await e.convertToBlob();
-    t = await ie(n);
-  } else (e instanceof File || e instanceof Blob) && (t = await ie(e));
+    t = await ce(n);
+  } else (e instanceof File || e instanceof Blob) && (t = await ce(e));
   return new Uint8Array(t);
 };
-var et = le;
-const tt = Ve, rt = Ke, nt = Je, ot = Xe, at = Qe, st = et;
-var it = {
-  defaultOptions: tt,
-  spawnWorker: rt,
-  terminateWorker: nt,
-  onMessage: ot,
-  send: at,
-  loadImage: st
+var rt = ue;
+const nt = Je, ot = Xe, at = Qe, it = et, st = tt, ct = rt;
+var lt = {
+  defaultOptions: nt,
+  spawnWorker: ot,
+  terminateWorker: at,
+  onMessage: it,
+  send: st,
+  loadImage: ct
 };
-const ct = We, W = Be, { log: fe } = ne, lt = Ce, Y = Ue, {
-  defaultOptions: ut,
-  spawnWorker: dt,
-  terminateWorker: ft,
-  onMessage: ht,
-  loadImage: he,
-  send: gt
-} = it;
-let ge = 0;
-var be = async (e = "eng", t = Y.LSTM_ONLY, n = {}, r = {}) => {
-  const o = lt("Worker", ge), {
+const ut = We, G = Ne, { log: he } = oe, dt = Ie, Y = je, {
+  defaultOptions: ft,
+  spawnWorker: ht,
+  terminateWorker: gt,
+  onMessage: mt,
+  loadImage: ge,
+  send: wt
+} = lt;
+let me = 0;
+var Ee = async (e = "eng", t = Y.LSTM_ONLY, n = {}, r = {}) => {
+  const o = dt("Worker", me), {
     logger: a,
-    errorHandler: s,
-    ...l
-  } = ct({
-    ...ut,
+    errorHandler: i,
+    ...s
+  } = ut({
+    ...ft,
     ...n
-  }), c = {}, h = typeof e == "string" ? e.split("+") : e;
-  let m = t, i = r;
-  const f = [Y.DEFAULT, Y.LSTM_ONLY].includes(t) && !l.legacyCore;
-  let p, I;
-  const A = new Promise((x, b) => {
-    I = x, p = b;
-  }), S = (x) => {
-    p(x.message);
+  }), u = {}, h = typeof e == "string" ? e.split("+") : e;
+  let m = t, c = r;
+  const g = [Y.DEFAULT, Y.LSTM_ONLY].includes(t) && !s.legacyCore;
+  let p, E;
+  const A = new Promise((b, C) => {
+    E = b, p = C;
+  }), S = (b) => {
+    p(b.message);
   };
-  let C = dt(l);
-  C.onerror = S, ge += 1;
-  const v = ({ id: x, action: b, payload: d }) => new Promise((u, g) => {
-    fe(`[${o}]: Start ${x}, action=${b}`);
-    const y = `${b}-${x}`;
-    c[y] = { resolve: u, reject: g }, gt(C, {
+  let x = ht(s);
+  x.onerror = S, me += 1;
+  const v = ({ id: b, action: C, payload: d }) => new Promise((l, f) => {
+    he(`[${o}]: Start ${b}, action=${C}`);
+    const y = `${C}-${b}`;
+    u[y] = { resolve: l, reject: f }, wt(x, {
       workerId: o,
-      jobId: x,
-      action: b,
+      jobId: b,
+      action: C,
       payload: d
     });
-  }), k = () => console.warn("`load` is depreciated and should be removed from code (workers now come pre-loaded)"), T = (x) => v(W({
-    id: x,
+  }), M = () => console.warn("`load` is depreciated and should be removed from code (workers now come pre-loaded)"), R = (b) => v(G({
+    id: b,
     action: "load",
-    payload: { options: { lstmOnly: f, corePath: l.corePath, logging: l.logging } }
-  })), D = (x, b, d) => v(W({
+    payload: { options: { lstmOnly: g, corePath: s.corePath, logging: s.logging } }
+  })), O = (b, C, d) => v(G({
     id: d,
     action: "FS",
-    payload: { method: "writeFile", args: [x, b] }
-  })), R = (x, b) => v(W({
-    id: b,
+    payload: { method: "writeFile", args: [b, C] }
+  })), T = (b, C) => v(G({
+    id: C,
     action: "FS",
-    payload: { method: "readFile", args: [x, { encoding: "utf8" }] }
-  })), N = (x, b) => v(W({
-    id: b,
+    payload: { method: "readFile", args: [b, { encoding: "utf8" }] }
+  })), $ = (b, C) => v(G({
+    id: C,
     action: "FS",
-    payload: { method: "unlink", args: [x] }
-  })), P = (x, b, d) => v(W({
+    payload: { method: "unlink", args: [b] }
+  })), P = (b, C, d) => v(G({
     id: d,
     action: "FS",
-    payload: { method: x, args: b }
-  })), O = (x, b) => v(W({
-    id: b,
+    payload: { method: b, args: C }
+  })), D = (b, C) => v(G({
+    id: C,
     action: "loadLanguage",
     payload: {
-      langs: x,
+      langs: b,
       options: {
-        langPath: l.langPath,
-        dataPath: l.dataPath,
-        cachePath: l.cachePath,
-        cacheMethod: l.cacheMethod,
-        gzip: l.gzip,
-        lstmOnly: [Y.DEFAULT, Y.LSTM_ONLY].includes(m) && !l.legacyLang
+        langPath: s.langPath,
+        dataPath: s.dataPath,
+        cachePath: s.cachePath,
+        cacheMethod: s.cacheMethod,
+        gzip: s.gzip,
+        lstmOnly: [Y.DEFAULT, Y.LSTM_ONLY].includes(m) && !s.legacyLang
       }
     }
-  })), _ = (x, b, d, u) => v(W({
-    id: u,
+  })), _ = (b, C, d, l) => v(G({
+    id: l,
     action: "initialize",
-    payload: { langs: x, oem: b, config: d }
-  })), j = (x = "eng", b, d, u) => {
-    if (f && [Y.TESSERACT_ONLY, Y.TESSERACT_LSTM_COMBINED].includes(b)) throw Error("Legacy model requested but code missing.");
-    const g = b || m;
-    m = g;
-    const y = d || i;
-    i = y;
-    const E = (typeof x == "string" ? x.split("+") : x).filter((L) => !h.includes(L));
-    return h.push(...E), E.length > 0 ? O(E, u).then(() => _(x, g, y, u)) : _(x, g, y, u);
-  }, oe = (x = {}, b) => v(W({
-    id: b,
+    payload: { langs: b, oem: C, config: d }
+  })), Z = (b = "eng", C, d, l) => {
+    if (g && [Y.TESSERACT_ONLY, Y.TESSERACT_LSTM_COMBINED].includes(C)) throw Error("Legacy model requested but code missing.");
+    const f = C || m;
+    m = f;
+    const y = d || c;
+    c = y;
+    const I = (typeof b == "string" ? b.split("+") : b).filter((L) => !h.includes(L));
+    return h.push(...I), I.length > 0 ? D(I, l).then(() => _(b, f, y, l)) : _(b, f, y, l);
+  }, ae = (b = {}, C) => v(G({
+    id: C,
     action: "setParameters",
-    payload: { params: x }
-  })), Q = async (x, b = {}, d = {
+    payload: { params: b }
+  })), Q = async (b, C = {}, d = {
     text: !0
-  }, u) => v(W({
-    id: u,
+  }, l) => v(G({
+    id: l,
     action: "recognize",
-    payload: { image: await he(x), options: b, output: d }
-  })), ae = async (x, b) => {
-    if (f) throw Error("`worker.detect` requires Legacy model, which was not loaded.");
-    return v(W({
-      id: b,
+    payload: { image: await ge(b), options: C, output: d }
+  })), ie = async (b, C) => {
+    if (g) throw Error("`worker.detect` requires Legacy model, which was not loaded.");
+    return v(G({
+      id: C,
       action: "detect",
-      payload: { image: await he(x) }
+      payload: { image: await ge(b) }
     }));
-  }, Z = async () => (C !== null && (ft(C), C = null), Promise.resolve());
-  ht(C, ({
-    workerId: x,
-    jobId: b,
+  }, H = async () => (x !== null && (gt(x), x = null), Promise.resolve());
+  mt(x, ({
+    workerId: b,
+    jobId: C,
     status: d,
-    action: u,
-    data: g
+    action: l,
+    data: f
   }) => {
-    const y = `${u}-${b}`;
+    const y = `${l}-${C}`;
     if (d === "resolve")
-      fe(`[${x}]: Complete ${b}`), c[y].resolve({ jobId: b, data: g }), delete c[y];
+      he(`[${b}]: Complete ${C}`), u[y].resolve({ jobId: C, data: f }), delete u[y];
     else if (d === "reject")
-      if (c[y].reject(g), delete c[y], u === "load" && p(g), s)
-        s(g);
+      if (u[y].reject(f), delete u[y], l === "load" && p(f), i)
+        i(f);
       else
-        throw Error(g);
-    else d === "progress" && a({ ...g, userJobId: b });
+        throw Error(f);
+    else d === "progress" && a({ ...f, userJobId: C });
   });
   const V = {
     id: o,
-    worker: C,
-    load: k,
-    writeText: D,
-    readText: R,
-    removeFile: N,
+    worker: x,
+    load: M,
+    writeText: O,
+    readText: T,
+    removeFile: $,
     FS: P,
-    reinitialize: j,
-    setParameters: oe,
+    reinitialize: Z,
+    setParameters: ae,
     recognize: Q,
-    detect: ae,
-    terminate: Z
+    detect: ie,
+    terminate: H
   };
-  return T().then(() => O(e)).then(() => _(e, t, r)).then(() => I(V)).catch(() => {
+  return R().then(() => D(e)).then(() => _(e, t, r)).then(() => E(V)).catch(() => {
   }), A;
 };
-const Ie = be, mt = async (e, t, n) => {
-  const r = await Ie(t, 1, n);
+const Se = Ee, yt = async (e, t, n) => {
+  const r = await Se(t, 1, n);
   return r.recognize(e).finally(async () => {
     await r.terminate();
   });
 }, pt = async (e, t) => {
-  const n = await Ie("osd", 0, t);
+  const n = await Se("osd", 0, t);
   return n.detect(e).finally(async () => {
     await n.terminate();
   });
 };
-var wt = {
-  recognize: mt,
+var vt = {
+  recognize: yt,
   detect: pt
 };
-const yt = be, vt = wt;
-var xt = {
-  createWorker: yt,
-  ...vt
+const bt = Ee, xt = vt;
+var Ct = {
+  createWorker: bt,
+  ...xt
 };
-let ce = null, X = null, me = Promise.resolve();
-async function Ct(e = "eng") {
-  return ce || X || (X = (async () => {
+let le = null, X = null, we = Promise.resolve();
+async function It(e = "eng") {
+  return le || X || (X = (async () => {
     try {
-      console.log(`[TesseractWorker] Spawning local OCR worker for language: ${e}...`);
-      const t = chrome.runtime.getURL("tesseract/worker.min.js"), n = chrome.runtime.getURL("tesseract/tesseract-core.wasm.js"), r = chrome.runtime.getURL("tesseract/");
-      console.log("[TesseractWorker] Configuring local sandboxed paths:", { workerPath: t, corePath: n, langPath: r });
-      const o = await xt.createWorker(e, 1, {
-        workerPath: t,
-        corePath: n,
-        langPath: r,
+      console.log("[TesseractWorker] Spawning local OCR worker...");
+      const t = await Ct.createWorker(e, 1, {
+        workerPath: chrome.runtime.getURL("tesseract/worker.min.js"),
+        corePath: chrome.runtime.getURL("tesseract/tesseract-core.wasm.js"),
+        langPath: chrome.runtime.getURL("tesseract/"),
         workerBlobURL: !1,
-        // <-- CRITICAL MV3 FIX: Disables Blob workers to bypass importScripts CSP
-        cacheMethod: "none",
-        // Prevent trying to write to browser IndexedDB caches
-        gzip: !0,
-        // eng.traineddata.gz is compressed
-        logger: (a) => {
-          a.status === "recognizing text" && console.log(`[TesseractWorker] OCR Progress: ${Math.round(a.progress * 100)}%`);
-        }
+        cacheMethod: "none"
       });
-      return ce = o, o;
+      return await t.setParameters({
+        tessedit_pageseg_mode: "3",
+        // Auto segmentation
+        tessedit_create_hocr: "1",
+        // Force HTML layout metadata
+        tessedit_create_tsv: "1",
+        // Force Tabular layout (guarantees words array)
+        tessedit_ocr_engine_mode: "1"
+        // Neural Net (best accuracy)
+      }), le = t, t;
     } catch (t) {
-      throw console.error("[TesseractWorker] Failed to create or load worker:", t), X = null, t;
+      throw console.error("[TesseractWorker] Failed to create worker:", t), X = null, t;
     }
   })(), X);
 }
-async function bt(e) {
+async function Et(e) {
   let t;
   const n = new Promise((r) => {
-    me.then(() => r());
+    we.then(() => r());
   });
-  me = new Promise((r) => {
+  we = new Promise((r) => {
     t = r;
   }), await n;
   try {
-    const r = await Ct();
-    return console.log("[TesseractWorker] Invoking worker.recognize directly with canvas context object..."), await r.recognize(e);
+    return await (await It()).recognize(e, {
+      tessjs_create_hocr: "1",
+      tessjs_create_tsv: "1"
+    });
   } finally {
     t();
   }
 }
-function It(e) {
-  return !e || !Array.isArray(e.words) ? [] : (console.log(`[ExtractWords] Extracting word structures. Found count: ${e.words.length}`), e.words.map((t) => ({
-    text: t.text || "",
-    confidence: typeof t.confidence == "number" ? t.confidence : 0,
-    bbox: {
-      x0: t.bbox ? t.bbox.x0 : 0,
-      y0: t.bbox ? t.bbox.y0 : 0,
-      x1: t.bbox ? t.bbox.x1 : 0,
-      y1: t.bbox ? t.bbox.y1 : 0
-    }
-  })));
+function St(e) {
+  if (!e) return [];
+  const t = [];
+  try {
+    e.words && Array.isArray(e.words) && e.words.length > 0 ? e.words.forEach((n) => {
+      n.bbox && n.text.trim().length > 0 && t.push({
+        text: n.text,
+        x0: n.bbox.x0,
+        y0: n.bbox.y0,
+        x1: n.bbox.x1,
+        y1: n.bbox.y1
+      });
+    }) : e.lines && Array.isArray(e.lines) && e.lines.forEach((n) => {
+      n.words && Array.isArray(n.words) && n.words.forEach((r) => {
+        r.bbox && r.text.trim().length > 0 && t.push({
+          text: r.text,
+          x0: r.bbox.x0,
+          y0: r.bbox.y0,
+          x1: r.bbox.x1,
+          y1: r.bbox.y1
+        });
+      });
+    });
+  } catch (n) {
+    console.error("[ExtractBoundingBoxes] Parsing failed silently:", n);
+  }
+  return t;
 }
-function Et(e) {
-  return !e || !Array.isArray(e.lines) ? [] : (console.log(`[ExtractLines] Organizing horizontal line blocks. Found count: ${e.lines.length}`), e.lines.map((t) => ({
-    text: t.text ? t.text.trim() : "",
-    bbox: {
-      x0: t.bbox ? t.bbox.x0 : 0,
-      y0: t.bbox ? t.bbox.y0 : 0,
-      x1: t.bbox ? t.bbox.x1 : 0,
-      y1: t.bbox ? t.bbox.y1 : 0
-    }
-  })));
+function Mt(e) {
+  const t = new Uint8Array(e);
+  let n = "";
+  const r = 8192;
+  for (let o = 0; o < t.length; o += r)
+    n += String.fromCharCode.apply(null, t.subarray(o, o + r));
+  return btoa(n);
 }
-function Ee(e) {
-  return !e || !Array.isArray(e.words) ? [] : (console.log("[ExtractBoundingBoxes] Compiling spatial coordinate box records..."), e.words.map((t) => {
-    const n = t.bbox ? t.bbox.x0 : 0, r = t.bbox ? t.bbox.y0 : 0, o = t.bbox ? t.bbox.x1 : 0, a = t.bbox ? t.bbox.y1 : 0;
-    return {
-      x: n,
-      y: r,
-      width: o - n,
-      height: a - r,
-      confidence: typeof t.confidence == "number" ? t.confidence : 0,
-      text: t.text || ""
-    };
-  }));
-}
-async function St(e) {
-  if (typeof document > "u" && typeof chrome < "u" && chrome.offscreen) {
-    console.log("[RecognizeImage] Running in Service Worker. Delegating OCR to Offscreen Document...");
-    try {
-      const r = e.getContext("2d").getImageData(0, 0, e.width, e.height), o = Array.from(r.data);
-      return await ve("RECOGNIZE_IMAGE", {
+async function kt(e) {
+  try {
+    if (typeof document > "u" && typeof chrome < "u" && chrome.offscreen) {
+      const n = e.getContext("2d", { willReadFrequently: !0 }).getImageData(0, 0, e.width, e.height), r = Mt(n.data.buffer);
+      if (!r || r.length < 100) throw new Error("OCR source data missing");
+      const o = await Be("RECOGNIZE_IMAGE", {
         width: e.width,
         height: e.height,
-        data: o
+        base64Data: r
       });
-    } catch (n) {
-      return console.error("[RecognizeImage] Offscreen OCR delegation failed.", n), {
-        text: "",
-        confidence: 0,
-        words: [],
-        lines: [],
-        boundingBoxes: [],
-        processingTime: 0,
-        error: n.message
+      return console.log(`[RecognizeImage] Received from Offscreen. Boxes: ${o?.boundingBoxes?.length || 0}`), o;
+    } else {
+      const t = await Et(e), n = t.data || t;
+      let r = n.words || [];
+      r.length === 0 && n.lines && n.lines.forEach((a) => {
+        a.words && r.push(...a.words);
+      });
+      const o = St(n);
+      return console.log(`[RecognizeImage] OCR Local Success. Words: ${r.length}. Boxes: ${o.length}`), {
+        text: n.text || "",
+        confidence: n.confidence || 0,
+        words: r,
+        boundingBoxes: o,
+        processingTime: t.processingTime || 0
       };
     }
-  }
-  const t = Date.now();
-  console.log("[RecognizeImage] Triggering character recognition loop...");
-  try {
-    if (!e)
-      throw new TypeError("Canvas parameter is required");
-    if (e.width === 0 || e.height === 0)
-      throw new Error("Canvas dimensions cannot be zero");
-    const n = await bt(e);
-    if (!n || !n.data)
-      throw new Error("Tesseract returned an empty or malformed result payload");
-    const { data: r } = n, o = It(r), a = Et(r), s = Ee(r), l = Date.now() - t;
-    return console.log(`[RecognizeImage] OCR successful. Latency: ${l}ms. Text length: ${r.text ? r.text.length : 0}`), {
-      text: r.text || "",
-      confidence: typeof r.confidence == "number" ? r.confidence : 0,
-      words: o,
-      lines: a,
-      boundingBoxes: s,
-      processingTime: l
-    };
-  } catch (n) {
-    return console.error("[RecognizeImage] OCR processing failed:", n), {
-      text: "",
-      confidence: 0,
-      words: [],
-      lines: [],
-      boundingBoxes: [],
-      processingTime: Date.now() - t,
-      error: n instanceof Error ? n.message : "Unknown OCR processing exception"
-    };
+  } catch (t) {
+    return console.error("[RecognizeImage] Pipeline failed:", t), { text: "", confidence: 0, words: [], boundingBoxes: [], processingTime: 0 };
   }
 }
-const At = {
+const Rt = {
   EMAIL: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
   PHONE: /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
   AADHAAR: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
@@ -1054,200 +997,40 @@ const At = {
   GITHUB_PAT: /\bghp_[a-zA-Z0-9]{36}\b/g,
   JWT_TOKEN: /\beyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\b/g,
   PASSWORD_PATTERNS: /\b(?:password|passwd|secret|passphrase)\s*[:=]\s*([a-zA-Z0-9!@#$%^&*()_+=-]{6,30})\b/gi
-}, kt = {
-  EMAIL: 0.95,
-  PHONE: 0.85,
-  AADHAAR: 0.9,
-  PAN: 0.95,
-  PASSPORT: 0.9,
-  DRIVING_LICENSE: 0.9,
-  IFSC: 0.95,
-  CREDIT_CARD: 0.8,
-  // Needs Luhn check to boost
-  UPI_ID: 0.9,
-  AWS_ACCESS_KEY: 0.99,
-  GOOGLE_API_KEY: 0.99,
-  GITHUB_PAT: 0.99,
-  JWT_TOKEN: 0.95,
-  PASSWORD_PATTERNS: 0.85
-};
-function Mt(e, t = []) {
-  if (!e)
-    return [];
-  console.log("[RegexDetector] Running sensitivity patterns scanning...");
-  const n = [], r = Tt(e, t);
-  for (const [o, a] of Object.entries(At)) {
-    a.lastIndex = 0;
-    let s;
-    for (; (s = a.exec(e)) !== null; ) {
-      const l = s[0], c = s.index, h = c + l.length, m = r.filter((f) => f.startIndex < h && f.endIndex > c).map((f) => ({
-        x: f.x,
-        y: f.y,
-        width: f.width,
-        height: f.height,
-        confidence: f.confidence
-      })), i = m.length > 0 ? m.reduce((f, p) => f + p.confidence, 0) / m.length : 0;
-      n.push({
-        type: o,
-        value: l,
-        regexConfidence: kt[o] || 0.8,
-        ocrConfidence: i / 100,
-        // Normalize to 0.0 - 1.0
-        startIndex: c,
-        endIndex: h,
-        bboxes: m,
+}, ye = (e) => (e || "").replace(/[\s\-_]/g, "").toLowerCase();
+function At(e, t = []) {
+  if (!e) return [];
+  console.log("[RegexDetector] Inspecting first 3 wordBoxes structure:", t.slice(0, 3));
+  const n = [];
+  for (const [r, o] of Object.entries(Rt)) {
+    o.lastIndex = 0;
+    let a;
+    for (; (a = o.exec(e)) !== null; ) {
+      const i = a[0], s = ye(i), u = t.filter((h) => {
+        const m = (h.text || h.word || h.value || h.content || "").toString().trim();
+        if (!m) return !1;
+        const c = ye(m);
+        return s.includes(c) || c.includes(s);
+      }).map(Ot);
+      u.length === 0 && console.warn(`[RegexDetector] Mapping FAILED for: "${i}".`), n.push({
+        type: r,
+        value: i,
+        bboxes: u,
         source: "regex"
       });
     }
   }
   return n;
 }
-function Tt(e, t) {
-  let n = 0;
-  return t.map((r) => {
-    if (!r.text)
-      return { ...r, startIndex: -1, endIndex: -1 };
-    const o = r.text.trim(), a = e.indexOf(o, n);
-    return a !== -1 ? (n = a + o.length, {
-      ...r,
-      startIndex: a,
-      endIndex: n
-    }) : { ...r, startIndex: -1, endIndex: -1 };
-  });
-}
-async function Dt(e) {
-  try {
-    return e ? (console.log("[MiniLMClassifier] Classifying text semantic structure..."), [
-      { topic: "Financial Statement", score: 0.94 },
-      { topic: "Personal Identifiable Information", score: 0.88 }
-    ]) : [];
-  } catch (t) {
-    throw console.error("[MiniLMClassifier] Semantic classification failed:", t), t;
-  }
-}
-const Ot = {
-  EMAIL: "medium",
-  PHONE: "low",
-  AADHAAR: "high",
-  PAN: "high",
-  PASSPORT: "high",
-  DRIVING_LICENSE: "high",
-  IFSC: "medium",
-  CREDIT_CARD: "critical",
-  UPI_ID: "medium",
-  AWS_ACCESS_KEY: "critical",
-  GOOGLE_API_KEY: "critical",
-  GITHUB_PAT: "critical",
-  JWT_TOKEN: "critical",
-  PASSWORD_PATTERNS: "critical"
-};
-function Rt(e) {
-  return Array.isArray(e) ? e.filter((t) => t.rulePassed === !1 ? (console.log(`[ConfidenceFusion] Dropping false positive: [${t.type}] "${t.value}" (failed checksum validation).`), !1) : !0).map((t) => {
-    const n = typeof t.ocrConfidence == "number" ? t.ocrConfidence : 0.5, r = typeof t.regexConfidence == "number" ? t.regexConfidence : 0.8;
-    let o = 0.7 * r + 0.3 * n;
-    return o = Math.min(1, Math.max(0, o)), {
-      type: t.type,
-      value: t.value,
-      ocrConfidence: n,
-      regexConfidence: r,
-      fusedConfidence: parseFloat(o.toFixed(4)),
-      severity: Ot[t.type] || "medium",
-      startIndex: t.startIndex,
-      endIndex: t.endIndex,
-      bboxes: t.bboxes || [],
-      source: t.source || "regex"
-    };
-  }) : [];
-}
-const Pt = [
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
-  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
-  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
-  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
-  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
-  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
-  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
-  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
-], _t = [
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
-  [5, 8, 0, 3, 7, 9, 1, 4, 6, 2],
-  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
-  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
-  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
-  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
-  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
-];
-function Lt(e) {
-  const t = e.replace(/[-\s]/g, "");
-  if (t.length !== 12 || !/^\d{12}$/.test(t) || t[0] === "0" || t[0] === "1")
-    return !1;
-  let n = 0;
-  const r = t.split("").map(Number).reverse();
-  for (let o = 0; o < r.length; o++)
-    n = Pt[n][_t[o % 8][r[o]]];
-  return n === 0;
-}
-function $t(e) {
-  const t = e.replace(/[-\s]/g, "");
-  if (!/^\d{13,19}$/.test(t))
-    return !1;
-  let n = 0, r = !1;
-  for (let o = t.length - 1; o >= 0; o--) {
-    let a = parseInt(t.charAt(o), 10);
-    r && (a *= 2, a > 9 && (a -= 9)), n += a, r = !r;
-  }
-  return n % 10 === 0;
-}
-function Bt(e) {
-  const t = /^[A-Z]{5}[0-9]{4}[A-Z]$/, n = e.trim().toUpperCase();
-  return t.test(n) ? ["P", "C", "H", "F", "A", "T", "B", "L", "J", "G"].includes(n[3]) : !1;
-}
-function Nt(e) {
-  const t = e.trim().toUpperCase();
-  return /^[A-PR-WYZ][0-9]{7}$/.test(t);
-}
-function Ft(e) {
-  const t = e.replace(/[-\s]/g, "").toUpperCase();
-  return /^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7}$/.test(t);
-}
-function zt(e) {
-  return Array.isArray(e) ? e.map((t) => {
-    let n = !0;
-    try {
-      switch (t.type) {
-        case "AADHAAR":
-          n = Lt(t.value);
-          break;
-        case "CREDIT_CARD":
-          n = $t(t.value);
-          break;
-        case "PAN":
-          n = Bt(t.value);
-          break;
-        case "PASSPORT":
-          n = Nt(t.value);
-          break;
-        case "DRIVING_LICENSE":
-          n = Ft(t.value);
-          break;
-        case "IFSC":
-          n = /^[A-Z]{4}0[A-Z0-9]{6}$/.test(t.value.trim().toUpperCase());
-          break;
-        default:
-          n = !0;
-          break;
-      }
-    } catch (r) {
-      console.warn(`[RuleEngine] Check execution exception for type ${t.type}:`, r), n = !1;
-    }
-    return {
-      ...t,
-      rulePassed: n
-    };
-  }) : [];
+function Ot(e) {
+  const t = e.bbox || e;
+  return {
+    x: t.x !== void 0 ? t.x : t.x0 || 0,
+    y: t.y !== void 0 ? t.y : t.y0 || 0,
+    width: t.width !== void 0 ? t.width : (t.x1 || 0) - (t.x0 || 0),
+    height: t.height !== void 0 ? t.height : (t.y1 || 0) - (t.y0 || 0),
+    confidence: e.confidence || 100
+  };
 }
 function ee(e) {
   if (!Array.isArray(e) || e.length <= 1)
@@ -1255,14 +1038,14 @@ function ee(e) {
   const t = [...e].sort((o, a) => o.x - a.x), n = [];
   let r = t[0];
   for (let o = 1; o < t.length; o++) {
-    const a = t[o], s = r.y + r.height, l = a.y + a.height, c = Math.min(s, l) - Math.max(r.y, a.y), h = a.x - (r.x + r.width);
-    if (c > 0 && h <= 15) {
-      const m = Math.min(r.x, a.x), i = Math.min(r.y, a.y), f = Math.max(r.x + r.width, a.x + a.width), p = Math.max(s, l);
+    const a = t[o], i = r.y + r.height, s = a.y + a.height, u = Math.min(i, s) - Math.max(r.y, a.y), h = a.x - (r.x + r.width);
+    if (u > 0 && h <= 15) {
+      const m = Math.min(r.x, a.x), c = Math.min(r.y, a.y), g = Math.max(r.x + r.width, a.x + a.width), p = Math.max(i, s);
       r = {
         x: m,
-        y: i,
-        width: f - m,
-        height: p - i,
+        y: c,
+        width: g - m,
+        height: p - c,
         confidence: Math.max(r.confidence, a.confidence)
       };
     } else
@@ -1270,40 +1053,40 @@ function ee(e) {
   }
   return n.push(r), n;
 }
-function Gt(e) {
+function Dt(e) {
   if (!Array.isArray(e) || e.length <= 1)
     return e || [];
-  const t = [...e].sort((a, s) => a.startIndex - s.startIndex), n = [];
+  const t = [...e].sort((a, i) => a.startIndex - i.startIndex), n = [];
   let r = t[0];
   for (let a = 1; a < t.length; a++) {
-    const s = t[a];
-    s.startIndex <= r.endIndex ? s.rulePassed && !r.rulePassed || s.rulePassed === r.rulePassed && s.regexConfidence > r.regexConfidence ? r = {
-      ...s,
+    const i = t[a];
+    i.startIndex <= r.endIndex ? i.rulePassed && !r.rulePassed || i.rulePassed === r.rulePassed && i.regexConfidence > r.regexConfidence ? r = {
+      ...i,
       startIndex: r.startIndex,
-      endIndex: Math.max(r.endIndex, s.endIndex),
-      value: r.value + s.value.substring(Math.max(0, r.endIndex - s.startIndex)),
-      bboxes: ee([...r.bboxes, ...s.bboxes])
+      endIndex: Math.max(r.endIndex, i.endIndex),
+      value: r.value + i.value.substring(Math.max(0, r.endIndex - i.startIndex)),
+      bboxes: ee([...r.bboxes, ...i.bboxes])
     } : r = {
       ...r,
-      endIndex: Math.max(r.endIndex, s.endIndex),
-      value: r.value + s.value.substring(Math.max(0, r.endIndex - s.startIndex)),
-      bboxes: ee([...r.bboxes, ...s.bboxes])
-    } : (r.bboxes = ee(r.bboxes), n.push(r), r = s);
+      endIndex: Math.max(r.endIndex, i.endIndex),
+      value: r.value + i.value.substring(Math.max(0, r.endIndex - i.startIndex)),
+      bboxes: ee([...r.bboxes, ...i.bboxes])
+    } : (r.bboxes = ee(r.bboxes), n.push(r), r = i);
   }
   r.bboxes = ee(r.bboxes), n.push(r);
   const o = /* @__PURE__ */ new Set();
   return n.filter((a) => {
-    const s = `${a.type}_${a.startIndex}_${a.value}`;
-    return o.has(s) ? !1 : (o.add(s), !0);
+    const i = `${a.type}_${a.startIndex}_${a.value}`;
+    return o.has(i) ? !1 : (o.add(i), !0);
   });
 }
-const Wt = {
+const Tt = {
   critical: 10,
   high: 5,
   medium: 2,
   low: 1
 };
-function Ut(e) {
+function Pt(e) {
   if (!Array.isArray(e) || e.length === 0)
     return {
       riskLevel: "low",
@@ -1312,8 +1095,8 @@ function Ut(e) {
     };
   let t = 0, n = !1;
   e.forEach((o) => {
-    const a = Wt[o.severity] || 2, s = typeof o.fusedConfidence == "number" ? o.fusedConfidence : 0.8;
-    t += a * s, o.severity === "critical" && s >= 0.7 && (n = !0);
+    const a = Tt[o.severity] || 2, i = typeof o.fusedConfidence == "number" ? o.fusedConfidence : 0.8;
+    t += a * i, o.severity === "critical" && i >= 0.7 && (n = !0);
   });
   let r = "low";
   return n || t >= 15 ? r = "critical" : t >= 5 ? r = "high" : t >= 2 && (r = "medium"), console.log(`[RiskAnalyzer] Calculated document risk score: ${t.toFixed(2)} -> Level: ${r.toUpperCase()}`), {
@@ -1322,117 +1105,68 @@ function Ut(e) {
     detections: e
   };
 }
-async function Se(e) {
-  if (!e)
-    throw new TypeError("File parameter is required");
+async function Me(e) {
+  if (!e) throw new TypeError("File parameter is required");
   if (typeof document > "u") {
-    const t = await e.arrayBuffer(), n = new Blob([t], { type: e.type || "image/png" }), r = await createImageBitmap(n);
-    console.log("[ScanService] createImageBitmap succeeded");
-    const o = new OffscreenCanvas(r.width, r.height);
-    return o.getContext("2d").drawImage(r, 0, 0), o;
+    const t = await e.arrayBuffer(), n = new Blob([t], { type: e.type || "image/png" }), r = await createImageBitmap(n), o = new OffscreenCanvas(r.width, r.height);
+    return o.getContext("2d", { willReadFrequently: !0 }).drawImage(r, 0, 0), o;
   } else
     return new Promise((t, n) => {
       const r = new FileReader();
       r.onload = (o) => {
         const a = new Image();
         a.onload = () => {
-          const s = document.createElement("canvas");
-          s.width = a.width, s.height = a.height, s.getContext("2d").drawImage(a, 0, 0), t(s);
-        }, a.onerror = (s) => n(new Error(`Failed to decode image pixels: ${s}`)), a.src = o.target.result;
-      }, r.onerror = (o) => n(new Error(`Failed to read file buffer: ${o}`)), r.readAsDataURL(e);
+          const i = document.createElement("canvas");
+          i.width = a.width, i.height = a.height, i.getContext("2d", { willReadFrequently: !0 }).drawImage(a, 0, 0), t(i);
+        }, a.onerror = (i) => n(new Error(`Failed to decode image: ${i}`)), a.src = o.target.result;
+      }, r.onerror = (o) => n(new Error(`Failed to read file: ${o}`)), r.readAsDataURL(e);
     });
 }
-async function qt(e, t = {}) {
+async function _t(e, t = {}) {
   const n = Date.now();
-  console.log(`[ScanService] Initiating scan pipeline for file: ${e.name} (${e.size} bytes)`);
   try {
-    const r = await Se(e), o = await xe(r, t.preprocess), a = await St(o), s = Ee(a), l = Mt(a.text, s), c = zt(l), h = await Dt(a.text), m = Rt(c, h), i = Gt(m), f = Ut(i), p = Date.now() - n;
-    return console.log(`[ScanService] Scan pipeline resolved in ${p}ms. Risk: ${f.riskLevel.toUpperCase()}`), {
+    const r = await Me(e), o = await Ce(r, t.preprocess), a = await kt(o), i = a.boundingBoxes || [];
+    console.log(`[ScanService] Pipeline running with ${i.length} boxes.`);
+    const s = At(a.text, i), u = Dt(s), h = Pt(u);
+    return {
       success: !0,
-      riskLevel: f.riskLevel,
-      score: f.score,
-      piiCount: i.length,
-      detections: i,
-      processingTime: p,
-      metadata: {
-        name: e.name,
-        size: e.size,
-        type: e.type
-      }
+      detections: u,
+      riskLevel: h.riskLevel,
+      processingTime: Date.now() - n
     };
   } catch (r) {
-    return console.error("[ScanService] Scan pipeline failed:", r), {
-      success: !1,
-      riskLevel: "low",
-      score: 0,
-      piiCount: 0,
-      detections: [],
-      processingTime: Date.now() - n,
-      metadata: {
-        name: e.name,
-        size: e.size,
-        type: e.type
-      },
-      error: r instanceof Error ? r.message : "Unknown scan pipeline failure"
-    };
+    return console.error("[ScanService] Pipeline failed:", r), { success: !1, detections: [], error: r.message };
   }
 }
-async function Ht(e, t) {
-  try {
-    if (!e)
-      throw new TypeError("Canvas parameter is required");
-    const n = e.getContext("2d"), r = e.width, o = e.height, a = n.getImageData(0, 0, r, o), s = a.data, l = t * 0.8;
-    for (let m = 0; m < s.length; m += 4) {
-      const i = m / 4, f = i % r, p = Math.floor(i / r), I = Math.sin(f * 0.8) * Math.cos(p * 0.8) * l, A = Math.cos(f * 0.8) * Math.sin(p * 0.8) * l, S = Math.sin((f + p) * 0.5) * l;
-      s[m] = Math.min(255, Math.max(0, s[m] + I)), s[m + 1] = Math.min(255, Math.max(0, s[m + 1] + A)), s[m + 2] = Math.min(255, Math.max(0, s[m + 2] + S));
-    }
-    const c = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(r, o) : document.createElement("canvas");
-    return c.width = r, c.height = o, c.getContext("2d").putImageData(a, 0, 0), c;
-  } catch (n) {
-    throw console.error("[Perturbation] Error applying pixel alterations:", n), n;
-  }
-}
-async function Yt(e, t = {}) {
-  const { strength: n = 5 } = t;
-  try {
-    if (!e)
-      throw new TypeError("Canvas parameter is required");
-    console.log(`[AICloak] Injecting adversarial cloak (intensity: ${n})...`);
-    const r = await Ht(e, n);
-    return console.log("[AICloak] Adversarial noise mapping completed."), r;
-  } catch (r) {
-    throw console.error("[AICloak] Failed to apply adversarial cloaking:", r), r;
-  }
-}
-function jt(e) {
+function Lt(e) {
   const n = Array.from({ length: 8 }, () => new Array(8).fill(0));
   for (let r = 0; r < 8; r++)
     for (let o = 0; o < 8; o++) {
       let a = 0;
-      for (let c = 0; c < 8; c++)
+      for (let u = 0; u < 8; u++)
         for (let h = 0; h < 8; h++)
-          a += e[c][h] * Math.cos((2 * c + 1) * r * Math.PI / 16) * Math.cos((2 * h + 1) * o * Math.PI / 16);
-      const s = r === 0 ? 1 / Math.sqrt(2) : 1, l = o === 0 ? 1 / Math.sqrt(2) : 1;
-      n[r][o] = 0.25 * s * l * a;
+          a += e[u][h] * Math.cos((2 * u + 1) * r * Math.PI / 16) * Math.cos((2 * h + 1) * o * Math.PI / 16);
+      const i = r === 0 ? 1 / Math.sqrt(2) : 1, s = o === 0 ? 1 / Math.sqrt(2) : 1;
+      n[r][o] = 0.25 * i * s * a;
     }
   return n;
 }
-function Zt(e) {
+function Bt(e) {
   const n = Array.from({ length: 8 }, () => new Array(8).fill(0));
   for (let r = 0; r < 8; r++)
     for (let o = 0; o < 8; o++) {
       let a = 0;
-      for (let s = 0; s < 8; s++)
-        for (let l = 0; l < 8; l++) {
-          const c = s === 0 ? 1 / Math.sqrt(2) : 1, h = l === 0 ? 1 / Math.sqrt(2) : 1;
-          a += c * h * e[s][l] * Math.cos((2 * r + 1) * s * Math.PI / 16) * Math.cos((2 * o + 1) * l * Math.PI / 16);
+      for (let i = 0; i < 8; i++)
+        for (let s = 0; s < 8; s++) {
+          const u = i === 0 ? 1 / Math.sqrt(2) : 1, h = s === 0 ? 1 / Math.sqrt(2) : 1;
+          a += u * h * e[i][s] * Math.cos((2 * r + 1) * i * Math.PI / 16) * Math.cos((2 * o + 1) * s * Math.PI / 16);
         }
       n[r][o] = 0.25 * a;
     }
   return n;
 }
-const $ = 8, te = 20;
-function Vt(e) {
+const B = 8, te = 20;
+function Ft(e) {
   const t = [];
   for (let n = 0; n < e.length; n++) {
     const r = e.charCodeAt(n);
@@ -1441,33 +1175,33 @@ function Vt(e) {
   }
   return t;
 }
-async function Kt(e, t) {
+async function $t(e, t) {
   try {
     if (!e)
       throw new TypeError("Canvas parameter is required");
     console.log(`[WatermarkEngine] Embedding invisible DCT watermark: "${t}"`);
-    const n = e.getContext("2d"), r = e.width, o = e.height, a = n.getImageData(0, 0, r, o), s = a.data, l = Vt(t + "\0");
-    let c = 0;
-    const h = Math.floor(r / $) * $, m = Math.floor(o / $) * $;
-    for (let i = 0; i < m; i += $)
-      for (let f = 0; f < h; f += $) {
-        const p = Array.from({ length: $ }, () => new Array($).fill(0)), I = Array.from({ length: $ }, () => new Array($).fill(0)), A = Array.from({ length: $ }, () => new Array($).fill(0));
-        for (let v = 0; v < $; v++)
-          for (let k = 0; k < $; k++) {
-            const T = ((i + v) * r + (f + k)) * 4, D = s[T], R = s[T + 1], N = s[T + 2];
-            p[v][k] = 0.299 * D + 0.587 * R + 0.114 * N, I[v][k] = 128 - 0.1687 * D - 0.3313 * R + 0.5 * N, A[v][k] = 128 + 0.5 * D - 0.4187 * R - 0.0813 * N;
+    const n = e.getContext("2d", { willReadFrequently: !0 }), r = e.width, o = e.height, a = n.getImageData(0, 0, r, o), i = a.data, s = Ft(t + "\0");
+    let u = 0;
+    const h = Math.floor(r / B) * B, m = Math.floor(o / B) * B;
+    for (let c = 0; c < m; c += B)
+      for (let g = 0; g < h; g += B) {
+        const p = Array.from({ length: B }, () => new Array(B).fill(0)), E = Array.from({ length: B }, () => new Array(B).fill(0)), A = Array.from({ length: B }, () => new Array(B).fill(0));
+        for (let v = 0; v < B; v++)
+          for (let M = 0; M < B; M++) {
+            const R = ((c + v) * r + (g + M)) * 4, O = i[R], T = i[R + 1], $ = i[R + 2];
+            p[v][M] = 0.299 * O + 0.587 * T + 0.114 * $, E[v][M] = 128 - 0.1687 * O - 0.3313 * T + 0.5 * $, A[v][M] = 128 + 0.5 * O - 0.4187 * T - 0.0813 * $;
           }
-        const S = jt(p);
-        if (c < l.length) {
-          const v = l[c], k = S[4][4], T = Math.round(k / te) * te;
-          S[4][4] = v === 1 ? T + te / 4 : T - te / 4, c++;
+        const S = Lt(p);
+        if (u < s.length) {
+          const v = s[u], M = S[4][4], R = Math.round(M / te) * te;
+          S[4][4] = v === 1 ? R + te / 4 : R - te / 4, u++;
         }
-        const C = Zt(S);
-        for (let v = 0; v < $; v++)
-          for (let k = 0; k < $; k++) {
-            const T = ((i + v) * r + (f + k)) * 4, D = C[v][k], R = I[v][k], N = A[v][k];
-            let P = Math.round(D + 1.402 * (N - 128)), O = Math.round(D - 0.3441 * (R - 128) - 0.7141 * (N - 128)), _ = Math.round(D + 1.772 * (R - 128));
-            s[T] = Math.max(0, Math.min(255, P)), s[T + 1] = Math.max(0, Math.min(255, O)), s[T + 2] = Math.max(0, Math.min(255, _));
+        const x = Bt(S);
+        for (let v = 0; v < B; v++)
+          for (let M = 0; M < B; M++) {
+            const R = ((c + v) * r + (g + M)) * 4, O = x[v][M], T = E[v][M], $ = A[v][M];
+            let P = Math.round(O + 1.402 * ($ - 128)), D = Math.round(O - 0.3441 * (T - 128) - 0.7141 * ($ - 128)), _ = Math.round(O + 1.772 * (T - 128));
+            i[R] = Math.max(0, Math.min(255, P)), i[R + 1] = Math.max(0, Math.min(255, D)), i[R + 2] = Math.max(0, Math.min(255, _));
           }
       }
     return n.putImageData(a, 0, 0), e;
@@ -1475,13 +1209,13 @@ async function Kt(e, t) {
     throw console.error("[WatermarkEngine] Failed to embed watermark:", n), n;
   }
 }
-function Jt(e, t = 8, n = 6, r = 99999, o = 99999) {
+function Nt(e, t = 8, n = 6, r = 99999, o = 99999) {
   if (!e)
     throw new TypeError("Box object is required");
-  const a = Math.max(0, e.x - t), s = Math.max(0, e.y - n), l = Math.min(r, e.x + e.width + t), c = Math.min(o, e.y + e.height + n), h = l - a, m = c - s;
-  return { x: a, y: s, width: h, height: m };
+  const a = Math.max(0, e.x - t), i = Math.max(0, e.y - n), s = Math.min(r, e.x + e.width + t), u = Math.min(o, e.y + e.height + n), h = s - a, m = u - i;
+  return { x: a, y: i, width: h, height: m };
 }
-function Xt(e) {
+function qt(e) {
   if (!Array.isArray(e) || e.length === 0)
     return [];
   if (e.length === 1) {
@@ -1504,11 +1238,11 @@ function Xt(e) {
     detections: t[0].detection ? [t[0].detection] : []
   };
   for (let o = 1; o < t.length; o++) {
-    const a = t[o], s = r.x + r.width, l = r.y + r.height, c = a.x + a.width, h = a.y + a.height, m = a.x <= s + 15, i = Math.min(l, h) - Math.max(r.y, a.y) > 0;
-    if (m && i) {
-      const f = Math.min(r.x, a.x), p = Math.max(s, c), I = Math.min(r.y, a.y), A = Math.max(l, h);
-      r.x = f, r.width = p - f, r.y = I, r.height = A - I, a.detection && (r.detections.some(
-        (C) => C.type === a.detection.type && C.value === a.detection.value
+    const a = t[o], i = r.x + r.width, s = r.y + r.height, u = a.x + a.width, h = a.y + a.height, m = a.x <= i + 15, c = Math.min(s, h) - Math.max(r.y, a.y) > 0;
+    if (m && c) {
+      const g = Math.min(r.x, a.x), p = Math.max(i, u), E = Math.min(r.y, a.y), A = Math.max(s, h);
+      r.x = g, r.width = p - g, r.y = E, r.height = A - E, a.detection && (r.detections.some(
+        (x) => x.type === a.detection.type && x.value === a.detection.value
       ) || r.detections.push(a.detection));
     } else
       n.push(r), r = {
@@ -1521,22 +1255,22 @@ function Xt(e) {
   }
   return n.push(r), console.log(`[MergeBoundingBoxes] Consolidated into ${n.length} final bounding rectangles.`), n;
 }
-async function Ae(e, t, n = 15) {
+async function ke(e, t, n = 15) {
   if (!e)
     throw new TypeError("Canvas parameter is required");
   if (!Array.isArray(t) || t.length === 0)
     return e;
-  const r = e.getContext("2d");
+  const r = e.getContext("2d", { willReadFrequently: !0 });
   r.save();
   try {
     t.forEach((o) => {
-      const { x: a, y: s, width: l, height: c } = o, h = Math.max(0, a), m = Math.max(0, s), i = Math.min(e.width - h, l), f = Math.min(e.height - m, c);
-      if (i <= 0 || f <= 0)
+      const { x: a, y: i, width: s, height: u } = o, h = Math.max(0, a), m = Math.max(0, i), c = Math.min(e.width - h, s), g = Math.min(e.height - m, u);
+      if (c <= 0 || g <= 0)
         return;
-      const p = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(i, f) : document.createElement("canvas");
-      p.width = i, p.height = f, p.getContext("2d").drawImage(e, h, m, i, f, 0, 0, i, f), r.save();
+      const p = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(c, g) : document.createElement("canvas");
+      p.width = c, p.height = g, p.getContext("2d", { willReadFrequently: !0 }).drawImage(e, h, m, c, g, 0, 0, c, g), r.save();
       try {
-        r.beginPath(), r.rect(h, m, i, f), r.clip(), r.filter = `blur(${n}px)`, r.drawImage(p, h, m);
+        r.beginPath(), r.rect(h, m, c, g), r.clip(), r.filter = `blur(${n}px)`, r.drawImage(p, h, m);
       } finally {
         r.restore();
       }
@@ -1548,67 +1282,64 @@ async function Ae(e, t, n = 15) {
   }
   return e;
 }
-function Qt(e) {
+function zt(e) {
   const n = typeof OffscreenCanvas < "u" && e instanceof OffscreenCanvas ? new OffscreenCanvas(e.width, e.height) : document.createElement("canvas");
-  return n.width = e.width, n.height = e.height, n.getContext("2d").drawImage(e, 0, 0), n;
+  return n.width = e.width, n.height = e.height, n.getContext("2d", { willReadFrequently: !0 }).drawImage(e, 0, 0), n;
 }
-async function er(e, t, n = "redact", r = {}) {
+async function Gt(e, t, n = "redact", r = {}) {
   if (!e)
     throw new TypeError("Canvas parameter is required");
-  const o = Qt(e);
+  const o = zt(e);
   if (!Array.isArray(t) || t.length === 0)
     return o;
   const {
     paddingX: a = 8,
-    paddingY: s = 6,
-    blurRadius: l = 15,
-    pixelationScale: c = 8,
+    paddingY: i = 6,
+    blurRadius: s = 15,
+    pixelationScale: u = 8,
     fillStyle: h = "#000000"
   } = r;
   console.log(`[RedactCanvas] Running masking pipeline. Mode: ${n.toUpperCase()} on ${t.length} regions.`);
   const m = t.map(
-    (p) => Jt(p, a, s, o.width, o.height)
-  ), i = Xt(m), f = o.getContext("2d");
-  return n === "redact" ? (f.fillStyle = h, i.forEach((p) => {
-    const I = Math.max(0, p.x), A = Math.max(0, p.y), S = Math.min(o.width - I, p.width), C = Math.min(o.height - A, p.height);
-    S > 0 && C > 0 && f.fillRect(I, A, S, C);
-  })) : n === "blur" ? await Ae(o, i, l) : n === "pixelate" && tr(o, i, c), o;
+    (p) => Nt(p, a, i, o.width, o.height)
+  ), c = qt(m), g = o.getContext("2d", { willReadFrequently: !0 });
+  return n === "redact" ? (g.fillStyle = h, c.forEach((p) => {
+    const E = Math.max(0, p.x), A = Math.max(0, p.y), S = Math.min(o.width - E, p.width), x = Math.min(o.height - A, p.height);
+    S > 0 && x > 0 && g.fillRect(E, A, S, x);
+  })) : n === "blur" ? await ke(o, c, s) : n === "pixelate" && Ut(o, c, u), o;
 }
-function tr(e, t, n = 8) {
-  const r = e.getContext("2d");
+function Ut(e, t, n = 8) {
+  const r = e.getContext("2d", { willReadFrequently: !0 });
   t.forEach((o) => {
-    const { x: a, y: s, width: l, height: c } = o, h = Math.max(0, a), m = Math.max(0, s), i = Math.min(e.width - h, l), f = Math.min(e.height - m, c);
-    if (i <= 0 || f <= 0)
+    const { x: a, y: i, width: s, height: u } = o, h = Math.max(0, a), m = Math.max(0, i), c = Math.min(e.width - h, s), g = Math.min(e.height - m, u);
+    if (c <= 0 || g <= 0)
       return;
-    const p = r.getImageData(h, m, i, f), I = p.data;
-    for (let A = 0; A < f; A += n)
-      for (let S = 0; S < i; S += n) {
-        let C = 0, v = 0, k = 0, T = 0;
-        for (let P = 0; P < n && A + P < f; P++)
-          for (let O = 0; O < n && S + O < i; O++) {
-            const _ = ((A + P) * i + (S + O)) * 4;
-            C += I[_], v += I[_ + 1], k += I[_ + 2], T++;
+    const p = r.getImageData(h, m, c, g), E = p.data;
+    for (let A = 0; A < g; A += n)
+      for (let S = 0; S < c; S += n) {
+        let x = 0, v = 0, M = 0, R = 0;
+        for (let P = 0; P < n && A + P < g; P++)
+          for (let D = 0; D < n && S + D < c; D++) {
+            const _ = ((A + P) * c + (S + D)) * 4;
+            x += E[_], v += E[_ + 1], M += E[_ + 2], R++;
           }
-        const D = Math.round(C / T), R = Math.round(v / T), N = Math.round(k / T);
-        for (let P = 0; P < n && A + P < f; P++)
-          for (let O = 0; O < n && S + O < i; O++) {
-            const _ = ((A + P) * i + (S + O)) * 4;
-            I[_] = D, I[_ + 1] = R, I[_ + 2] = N;
+        const O = Math.round(x / R), T = Math.round(v / R), $ = Math.round(M / R);
+        for (let P = 0; P < n && A + P < g; P++)
+          for (let D = 0; D < n && S + D < c; D++) {
+            const _ = ((A + P) * c + (S + D)) * 4;
+            E[_] = O, E[_ + 1] = T, E[_ + 2] = $;
           }
       }
     r.putImageData(p, h, m);
   });
 }
-async function rr(e, t) {
-  return console.log("[AIService] Delegating adversarial cloaking request..."), Yt(e, { strength: t });
+async function Wt(e, t) {
+  return console.log("[AIService] Delegating invisible watermark embedding..."), $t(e, t);
 }
-async function nr(e, t) {
-  return console.log("[AIService] Delegating invisible watermark embedding..."), Kt(e, t);
+async function jt(e, t, n = "redact") {
+  return console.log(`[AIService] Delegating redaction request (mode: ${n}) for ${t.length} regions.`), n === "blur" ? ke(e, t, 8) : Gt(e, t, "redact", { fillStyle: "#000000" });
 }
-async function or(e, t, n = "redact") {
-  return console.log(`[AIService] Delegating redaction request (mode: ${n}) for ${t.length} regions.`), n === "blur" ? Ae(e, t, 8) : er(e, t, "redact", { fillStyle: "#000000" });
-}
-async function ar(e, t, n = {}) {
+async function Yt(e, t, n = {}) {
   const { blurMode: r = "redact" } = n;
   try {
     if (!e)
@@ -1616,307 +1347,217 @@ async function ar(e, t, n = {}) {
     if (!Array.isArray(t) || t.length === 0)
       return e;
     const o = [];
-    return t.forEach((s) => {
-      Array.isArray(s.bboxes) && s.bboxes.forEach((l) => {
-        o.push({
-          x: l.x,
-          y: l.y,
-          width: l.width,
-          height: l.height
+    return t.forEach((i) => {
+      Array.isArray(i.bboxes) && i.bboxes.forEach((s) => {
+        s && typeof s.x == "number" && typeof s.width == "number" && s.width > 0 && s.height > 0 && o.push({
+          x: s.x,
+          y: s.y,
+          width: s.width,
+          height: s.height
         });
       });
-    }), o.length === 0 ? (console.log("[BlurService] No bounding boxes found in detections. Skipping redaction."), e) : (console.log(`[BlurService] Requesting redaction of ${o.length} bounding boxes in mode: ${r}`), await or(e, o, r));
+    }), o.length === 0 ? (console.log("[BlurService] No bounding boxes found in detections. Skipping redaction."), e) : (console.log(`[BlurService] Requesting redaction of ${o.length} bounding boxes in mode: ${r}`), await jt(e, o, r));
   } catch (o) {
     throw console.error("[BlurService] Redaction processing failed:", o), o;
   }
 }
-const U = 8, B = 32;
-async function sr(e) {
+const U = 8, F = 32;
+async function Zt(e) {
   try {
     if (!e)
       throw new TypeError("Canvas parameter is required");
-    const t = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(B, B) : document.createElement("canvas");
-    t.width = B, t.height = B;
-    const n = t.getContext("2d");
-    n.drawImage(e, 0, 0, B, B);
-    const o = n.getImageData(0, 0, B, B).data, a = new Float32Array(B * B);
-    for (let i = 0; i < o.length; i += 4)
-      a[i / 4] = 0.299 * o[i] + 0.587 * o[i + 1] + 0.114 * o[i + 2];
-    const s = Array.from({ length: U }, () => new Float32Array(U));
-    for (let i = 0; i < U; i++)
-      for (let f = 0; f < U; f++) {
+    const t = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(F, F) : document.createElement("canvas");
+    t.width = F, t.height = F;
+    const n = t.getContext("2d", { willReadFrequently: !0 });
+    n.drawImage(e, 0, 0, F, F);
+    const o = n.getImageData(0, 0, F, F).data, a = new Float32Array(F * F);
+    for (let c = 0; c < o.length; c += 4)
+      a[c / 4] = 0.299 * o[c] + 0.587 * o[c + 1] + 0.114 * o[c + 2];
+    const i = Array.from({ length: U }, () => new Float32Array(U));
+    for (let c = 0; c < U; c++)
+      for (let g = 0; g < U; g++) {
         let p = 0;
-        for (let S = 0; S < B; S++)
-          for (let C = 0; C < B; C++)
-            p += a[S * B + C] * Math.cos((2 * S + 1) * i * Math.PI / (2 * B)) * Math.cos((2 * C + 1) * f * Math.PI / (2 * B));
-        const I = i === 0 ? 1 / Math.sqrt(2) : 1, A = f === 0 ? 1 / Math.sqrt(2) : 1;
-        s[i][f] = 2 / B * I * A * p;
+        for (let S = 0; S < F; S++)
+          for (let x = 0; x < F; x++)
+            p += a[S * F + x] * Math.cos((2 * S + 1) * c * Math.PI / (2 * F)) * Math.cos((2 * x + 1) * g * Math.PI / (2 * F));
+        const E = c === 0 ? 1 / Math.sqrt(2) : 1, A = g === 0 ? 1 / Math.sqrt(2) : 1;
+        i[c][g] = 2 / F * E * A * p;
       }
-    let l = 0;
-    for (let i = 0; i < U; i++)
-      for (let f = 0; f < U; f++)
-        i === 0 && f === 0 || (l += s[i][f]);
-    const c = l / (U * U - 1);
+    let s = 0;
+    for (let c = 0; c < U; c++)
+      for (let g = 0; g < U; g++)
+        c === 0 && g === 0 || (s += i[c][g]);
+    const u = s / (U * U - 1);
     let h = "";
-    for (let i = 0; i < U; i++)
-      for (let f = 0; f < U; f++)
-        h += s[i][f] >= c ? "1" : "0";
+    for (let c = 0; c < U; c++)
+      for (let g = 0; g < U; g++)
+        h += i[c][g] >= u ? "1" : "0";
     let m = "";
-    for (let i = 0; i < 64; i += 4) {
-      const f = h.substring(i, i + 4);
-      m += parseInt(f, 2).toString(16);
+    for (let c = 0; c < 64; c += 4) {
+      const g = h.substring(c, c + 4);
+      m += parseInt(g, 2).toString(16);
     }
     return m;
   } catch (t) {
     throw console.error("[PHash] Error generating perceptual hash:", t), t;
   }
 }
-const q = 8, M = 16;
+const W = 8, k = 16;
 function pe(e, t) {
   const n = new Float32Array(t), r = t / 2;
   for (let o = 0; o < r; o++) {
-    const a = e[2 * o], s = e[2 * o + 1];
-    n[o] = (a + s) / Math.sqrt(2), n[r + o] = (a - s) / Math.sqrt(2);
+    const a = e[2 * o], i = e[2 * o + 1];
+    n[o] = (a + i) / Math.sqrt(2), n[r + o] = (a - i) / Math.sqrt(2);
   }
   for (let o = 0; o < t; o++)
     e[o] = n[o];
 }
-function ir(e) {
-  for (let t = 0; t < M; t++) {
-    const n = new Float32Array(M);
-    for (let r = 0; r < M; r++)
-      n[r] = e[t * M + r];
-    pe(n, M);
-    for (let r = 0; r < M; r++)
-      e[t * M + r] = n[r];
+function Ht(e) {
+  for (let t = 0; t < k; t++) {
+    const n = new Float32Array(k);
+    for (let r = 0; r < k; r++)
+      n[r] = e[t * k + r];
+    pe(n, k);
+    for (let r = 0; r < k; r++)
+      e[t * k + r] = n[r];
   }
-  for (let t = 0; t < M; t++) {
-    const n = new Float32Array(M);
-    for (let r = 0; r < M; r++)
-      n[r] = e[r * M + t];
-    pe(n, M);
-    for (let r = 0; r < M; r++)
-      e[r * M + t] = n[r];
+  for (let t = 0; t < k; t++) {
+    const n = new Float32Array(k);
+    for (let r = 0; r < k; r++)
+      n[r] = e[r * k + t];
+    pe(n, k);
+    for (let r = 0; r < k; r++)
+      e[r * k + t] = n[r];
   }
 }
-async function cr(e) {
+async function Vt(e) {
   try {
     if (!e)
       throw new TypeError("Canvas parameter is required");
-    const t = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(M, M) : document.createElement("canvas");
-    t.width = M, t.height = M;
-    const n = t.getContext("2d");
-    n.drawImage(e, 0, 0, M, M);
-    const o = n.getImageData(0, 0, M, M).data, a = new Float32Array(M * M);
-    for (let i = 0; i < o.length; i += 4)
-      a[i / 4] = 0.299 * o[i] + 0.587 * o[i + 1] + 0.114 * o[i + 2];
-    ir(a);
-    const s = Array.from({ length: q }, () => new Float32Array(q));
-    let l = 0;
-    for (let i = 0; i < q; i++)
-      for (let f = 0; f < q; f++) {
-        const p = a[i * M + f];
-        s[i][f] = p, l += p;
+    const t = typeof OffscreenCanvas < "u" ? new OffscreenCanvas(k, k) : document.createElement("canvas");
+    t.width = k, t.height = k;
+    const n = t.getContext("2d", { willReadFrequently: !0 });
+    n.drawImage(e, 0, 0, k, k);
+    const o = n.getImageData(0, 0, k, k).data, a = new Float32Array(k * k);
+    for (let c = 0; c < o.length; c += 4)
+      a[c / 4] = 0.299 * o[c] + 0.587 * o[c + 1] + 0.114 * o[c + 2];
+    Ht(a);
+    const i = Array.from({ length: W }, () => new Float32Array(W));
+    let s = 0;
+    for (let c = 0; c < W; c++)
+      for (let g = 0; g < W; g++) {
+        const p = a[c * k + g];
+        i[c][g] = p, s += p;
       }
-    const c = l / (q * q);
+    const u = s / (W * W);
     let h = "";
-    for (let i = 0; i < q; i++)
-      for (let f = 0; f < q; f++)
-        h += s[i][f] >= c ? "1" : "0";
+    for (let c = 0; c < W; c++)
+      for (let g = 0; g < W; g++)
+        h += i[c][g] >= u ? "1" : "0";
     let m = "";
-    for (let i = 0; i < 64; i += 4) {
-      const f = h.substring(i, i + 4);
-      m += parseInt(f, 2).toString(16);
+    for (let c = 0; c < 64; c += 4) {
+      const g = h.substring(c, c + 4);
+      m += parseInt(g, 2).toString(16);
     }
     return m;
   } catch (t) {
     throw console.error("[WHash] Error generating wavelet hash:", t), t;
   }
 }
-function lr(e, t, n) {
+function Kt(e, t, n) {
   return new Promise((r, o) => {
     if (!e)
       return o(new TypeError("Canvas parameter is required"));
     const a = t.replace(/(\.[\w\d]+)$/, "_protected$1");
     if (typeof OffscreenCanvas < "u" && e instanceof OffscreenCanvas)
-      e.convertToBlob({ type: n }).then((s) => {
-        if (!s)
-          return o(new Error("Failed to extract binary blob from offscreen canvas"));
-        const l = new File([s], a, {
-          type: n,
-          lastModified: Date.now()
-        });
-        r(l);
+      e.convertToBlob({ type: n }).then((i) => {
+        if (!i) return o(new Error("Failed to extract binary blob from offscreen canvas"));
+        r(new File([i], a, { type: n, lastModified: Date.now() }));
       }).catch(o);
     else {
       if (typeof e.toBlob != "function")
         return o(new TypeError("Canvas does not support toBlob operations"));
-      e.toBlob((s) => {
-        if (!s)
-          return o(new Error("Failed to extract binary blob from canvas"));
-        const l = new File([s], a, {
-          type: n,
-          lastModified: Date.now()
-        });
-        r(l);
+      e.toBlob((i) => {
+        if (!i) return o(new Error("Failed to extract binary blob from canvas"));
+        r(new File([i], a, { type: n, lastModified: Date.now() }));
       }, n);
     }
   });
 }
-async function ur(e, t = {}) {
+async function Jt(e, t = {}) {
   console.log(`[ProtectService] Initiating final protection pipeline for: ${e.name}`);
   const n = Date.now();
   try {
-    const r = await Se(e), o = await sr(r), a = await cr(r);
+    const r = await Me(e), o = await Zt(r), a = await Vt(r);
     console.log("[ProtectService] Generated original fingerprints:", { phash: o, whash: a });
-    const s = await qt(e, { preprocess: t });
-    if (!s.success)
-      throw new Error(`Scanning phase failed: ${s.error}`);
-    if (!(s.riskLevel !== "low" || t.autoRedact))
+    const i = await _t(e, { preprocess: t });
+    if (!i.success)
+      throw new Error(`Scanning phase failed: ${i.error}`);
+    if (!(i.riskLevel !== "low" || t.autoRedact))
       return console.log("[ProtectService] Document evaluated as low risk. Skipping edits."), {
         success: !0,
         originalFile: e,
         protectedFile: e,
-        // Return original file unmodified
         phash: o,
         whash: a,
-        metadata: {
-          name: e.name,
-          size: e.size,
-          type: e.type
-        },
+        metadata: { name: e.name, size: e.size, type: e.type },
         detections: [],
-        risk: s.riskLevel,
-        protectionSummary: {
-          processingTime: Date.now() - n,
-          redacted: !1
-        }
+        risk: i.riskLevel,
+        protectionSummary: { processingTime: Date.now() - n, redacted: !1 }
       };
     console.log(`[ProtectService] Applying visual protections (Mode: ${t.blurMode || "redact"})...`);
-    let c = await ar(r, s.detections, t);
-    t.aiCloakEnabled && (c = await rr(c, 5)), t.watermarkEnabled && (c = await nr(c, "SafeLens_Protected_Asset"));
-    const h = await lr(c, e.name, e.type);
+    let u = await Yt(r, i.detections, t);
+    t.aiCloakEnabled && (u = await adversarialCloak(u, 5)), t.watermarkEnabled && (u = await Wt(u, "SafeLens_Protected_Asset"));
+    const h = await Kt(u, e.name, e.type);
     return console.log(`[ProtectService] Protection pipeline complete. Output file: ${h.name}`), {
       success: !0,
       originalFile: e,
       protectedFile: h,
       phash: o,
       whash: a,
-      metadata: {
-        name: e.name,
-        size: e.size,
-        type: e.type
-      },
-      detections: s.detections,
-      risk: s.riskLevel,
-      protectionSummary: {
-        processingTime: Date.now() - n,
-        redacted: !0
-      }
+      metadata: { name: e.name, size: e.size, type: e.type },
+      detections: i.detections,
+      risk: i.riskLevel,
+      protectionSummary: { processingTime: Date.now() - n, redacted: !0 }
     };
   } catch (r) {
     return console.error("[ProtectService] Critical pipeline crash:", r), {
       success: !1,
       originalFile: e,
       protectedFile: e,
-      // Fallback to original file on failure
       phash: "",
       whash: "",
-      metadata: {
-        name: e.name,
-        size: e.size,
-        type: e.type
-      },
+      metadata: { name: e.name, size: e.size, type: e.type },
       detections: [],
       risk: "low",
-      protectionSummary: {
-        processingTime: Date.now() - n,
-        redacted: !1
-      },
+      protectionSummary: { processingTime: Date.now() - n, redacted: !1 },
       error: r instanceof Error ? r.message : "Unknown protection pipeline failure"
     };
   }
 }
-class dr {
+class Xt {
   constructor() {
     this.baseUrl = "https://safelens-zttx.onrender.com";
   }
   async fetchWithRetry(t, n = {}, r = 3, o = 1e3) {
-    let a = null, s = null;
-    for (let l = 0; l < r; l++) {
+    let a = null;
+    for (let i = 0; i < r; i++) {
       try {
-        const c = await fetch(t, n);
-        if (c.ok)
-          return c;
-        if (s = c, c.status >= 500 && c.status < 600)
-          console.warn(`[BridgeClient] Transient server error ${c.status}. Retrying in ${o}ms... (Attempt ${l + 1}/${r})`);
-        else
-          return c;
-      } catch (c) {
-        a = c, console.warn(`[BridgeClient] Network/connection error: ${c.message}. Retrying in ${o}ms... (Attempt ${l + 1}/${r})`);
+        const s = await fetch(t, n);
+        if (s.ok || s.status < 500 || s.status >= 600) return s;
+      } catch (s) {
+        a = s, console.warn(`[BridgeClient] Network connection error: ${s.message}. Retrying...`);
       }
-      l < r - 1 && await new Promise((c) => setTimeout(c, o));
+      i < r - 1 && await new Promise((s) => setTimeout(s, o));
     }
-    if (a)
-      throw a;
-    return s;
-  }
-  async checkHealth() {
-    console.log("[BridgeClient] Querying service connectivity health...");
-    try {
-      const t = await this.fetchWithRetry(`${this.baseUrl}/api/health`, { method: "GET" });
-      if (!t.ok)
-        throw new Error(`HTTP ${t.status}`);
-      const n = await t.json();
-      if (n.success)
-        return {
-          success: !0,
-          status: n.data.status || "healthy",
-          version: n.data.version || "1.0.0"
-        };
-      throw new Error(n.message || "Malformed health response");
-    } catch (t) {
-      return console.warn("[BridgeClient] Health check failed, operating in offline fallback mode:", t.message), { success: !1, status: "offline", version: "0.0.0" };
-    }
+    if (a) throw a;
   }
   /**
-   * Transmits binary blob image multipart form data strictly from Service Worker
-   */
-  async uploadProtectedAsset(t, n) {
-    console.log("[BridgeClient] Transferring protected asset file to live Render endpoints:", t.name);
-    try {
-      const r = new FormData();
-      r.append("image", t), r.append("blur_enabled", n.blur_enabled), r.append("ai_cloak", n.ai_cloak), r.append("watermark", n.watermark);
-      const o = await this.fetchWithRetry(`${this.baseUrl}/api/protect`, {
-        method: "POST",
-        body: r
-      });
-      if (!o.ok)
-        throw new Error(`Server returned HTTP code status ${o.status}`);
-      const a = await o.json();
-      if (a.success && a.data)
-        return { success: !0, assetId: a.data.asset_id };
-      throw new Error(a.message || "Malformed transaction result from deployed cluster");
-    } catch (r) {
-      return console.error("[BridgeClient] Isolated binary asset registration failure:", r.message), { success: !1, error: r.message };
-    }
-  }
-  async syncScanResult(t) {
-    if (!t)
-      throw new Error("Scan report payload is required");
-    return console.log("[BridgeClient] Syncing scan report to FastAPI backend dashboard:", t.metadata.name), {
-      success: (await this.checkHealth()).success,
-      syncId: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-    };
-  }
-  /**
-   * Triggers an incident alert notification on the backend when PII is intercepted.
+   * Universal Incident Notification Router
    */
   async sendIncidentNotification(t) {
-    if (!t)
-      throw new Error("Incident payload is required");
+    if (!t) throw new Error("Incident payload is required");
     const n = `${this.baseUrl}/api/incidents`;
-    console.warn(`[BridgeClient] Dispatching PRIVACY INCIDENT ALERT to target: ${n} on asset ID: ${t.assetId}`);
     try {
       const r = {
         asset_id: parseInt(t.assetId, 10),
@@ -1933,78 +1574,93 @@ class dr {
         body: JSON.stringify(r)
       });
       if (o.status === 405 || o.status === 404)
-        return console.warn(`[BridgeClient] POST method is unregistered on backend (${o.status}). Bypassing incident tracking gracefully to keep extension running.`), { success: !0, incidentId: `mock_inc_${Date.now()}` };
-      if (!o.ok)
-        throw new Error(`HTTP status verification failed: ${o.status}`);
+        return { success: !0, incidentId: `mock_inc_${Date.now()}` };
       const a = await o.json();
-      return a.success && a.data ? (console.log("[BridgeClient] Backend incident alert logged successfully. ID:", a.data.incident_id), { success: !0, incidentId: a.data.incident_id }) : { success: !0, incidentId: `mock_inc_${Date.now()}` };
+      return a.success && a.data ? { success: !0, incidentId: a.data.incident_id } : { success: !0, incidentId: `mock_inc_${Date.now()}` };
     } catch (r) {
-      return console.error("[BridgeClient] Incident pipeline warning handled:", r.message), { success: !0, incidentId: `mock_inc_${Date.now()}` };
+      return console.error("[BridgeClient] Incident pipeline handled gracefully:", r.message), { success: !0, incidentId: `mock_inc_${Date.now()}` };
     }
   }
-  async syncSettings(t) {
-    if (!t)
-      throw new Error("Settings payload is required");
-    console.log("[BridgeClient] Synchronizing Settings preferences with server profile...");
-    const n = { high: 90, medium: 70, low: 50 };
-    try {
-      const r = await this.fetchWithRetry(`${this.baseUrl}/api/settings`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          auto_blur: t.blurMode === "blur",
-          watermark_enabled: t.watermarkEnabled === !0,
-          ai_cloak_enabled: t.aiCloakEnabled === !0,
-          notifications: t.protectionEnabled === !0,
-          similarity_threshold: n[t.riskLevelThreshold] || 70
-        })
-      });
-      if (!r.ok)
-        throw new Error(`HTTP ${r.status}`);
-      return { success: (await r.json()).success === !0 };
-    } catch (r) {
-      return console.error("[BridgeClient] Central settings synchronization failed:", r.message), { success: !1 };
-    }
+  /**
+   * Explicit Mapper mapping to REGISTER_BACKEND_ASSET routine
+   */
+  async uploadProtectedAsset(t) {
+    return console.log("[BridgeClient] Mocking asset protection sync wrapper locally..."), { success: !0, data: { assetId: t?.assetId || Math.floor(Math.random() * 100) + 1 } };
+  }
+  /**
+   * Explicit Mapper mapping to LOG_SCAN tracking routine
+   */
+  async syncScanResult(t) {
+    return console.log("[BridgeClient] Registering scan analytics report metadata..."), this.sendIncidentNotification({
+      assetId: t?.assetId || 1,
+      matchedUrl: t?.matchedUrl || "unknown",
+      matchConfidence: t?.confidence || 0.85,
+      severity: t?.riskLevel === "critical" || t?.riskLevel === "high" ? "High" : "Normal",
+      status: "Open"
+    });
   }
 }
-const re = new dr();
-let we = Promise.resolve();
-const fr = {
+const re = new Xt();
+let ve = Promise.resolve();
+function be(e) {
+  if (!e) return "";
+  const t = new Uint8Array(e);
+  let n = "";
+  for (let r = 0; r < t.length; r++)
+    n += String.fromCharCode(t[r]);
+  return btoa(n);
+}
+function ne(e) {
+  if (!e) return new ArrayBuffer(0);
+  const t = atob(e), n = t.length, r = new Uint8Array(n);
+  for (let o = 0; o < n; o++)
+    r[o] = t.charCodeAt(o);
+  return r.buffer;
+}
+const Qt = {
   PING: async () => (console.log("[MessageRouter] PING message received. Sending PING response."), { ok: !0 }),
   PREPROCESS_IMAGE: async (e) => {
     if (!e || !e.arrayBuffer)
       throw new Error("Invalid payload: arrayBuffer is required");
-    await ye();
-    const { arrayBuffer: t, type: n, settings: r } = e, o = new Blob([t], { type: n || "image/png" }), a = await createImageBitmap(o), s = new OffscreenCanvas(a.width, a.height);
-    s.getContext("2d").drawImage(a, 0, 0);
-    const c = await xe(s, r);
+    await xe();
+    const { arrayBuffer: t, type: n, settings: r } = e, o = new Blob([t], { type: n || "image/png" }), a = await createImageBitmap(o), i = new OffscreenCanvas(a.width, a.height);
+    i.getContext("2d", { willReadFrequently: !0 }).drawImage(a, 0, 0);
+    const u = await Ce(i, r);
     return {
-      arrayBuffer: await (await c.convertToBlob({ type: n || "image/png" })).arrayBuffer(),
-      width: c.width,
-      height: c.height
+      arrayBuffer: await (await u.convertToBlob({ type: n || "image/png" })).arrayBuffer(),
+      width: u.width,
+      height: u.height
     };
   },
   RUN_PROTECT_PIPELINE: async (e) => {
-    if (!e || !e.arrayBuffer && !e.storageKey)
-      throw new Error("Invalid payload: arrayBuffer or storageKey is required");
+    if (!e || !e.arrayBuffer && !e.base64Data && !e.storageKey)
+      throw new Error("Invalid payload: base64Data or arrayBuffer is required");
     let t = e.arrayBuffer;
-    e.storageKey && (t = (await chrome.storage.session.get(e.storageKey))[e.storageKey], await chrome.storage.session.remove(e.storageKey), console.log("[MessageRouter] image transferred via storage.session successfully"));
-    const { name: n, type: r, settings: o } = e;
-    await ye();
-    const a = {
-      name: n || "upload.png",
+    if (e.base64Data)
+      t = ne(e.base64Data);
+    else if (e.storageKey) {
+      const h = await chrome.storage.local.get(e.storageKey), m = h ? h[e.storageKey] : null;
+      typeof m == "string" ? t = ne(m) : (m && m.byteLength || m && typeof m == "object") && (t = m), t && t.byteLength > 0 && await chrome.storage.local.remove(e.storageKey);
+    }
+    if (!t || !t.byteLength)
+      throw new Error("Invalid or corrupted image arrayBuffer received in pipeline gateway");
+    const n = "pending_image_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    await chrome.storage.local.set({ [n]: be(t) });
+    const { name: r, type: o, settings: a } = e;
+    await xe();
+    const i = {
+      name: r || "upload.png",
       size: t.byteLength,
-      type: r || "image/png",
+      type: o || "image/png",
       arrayBuffer: () => Promise.resolve(t)
-    }, s = await ur(a, o);
-    let l;
-    s.protectedFile && typeof s.protectedFile.arrayBuffer == "function" ? l = await s.protectedFile.arrayBuffer() : l = t;
-    const c = "protected_image_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-    return await chrome.storage.session.set({ [c]: l }), {
+    }, s = await Jt(i, a);
+    await chrome.storage.local.remove(n);
+    let u;
+    return s.protectedFile && typeof s.protectedFile.arrayBuffer == "function" ? u = await s.protectedFile.arrayBuffer() : u = t, {
       success: s.success !== !1,
-      storageKey: c,
-      name: s.protectedFile && s.protectedFile.name || n,
-      type: s.protectedFile && s.protectedFile.type || r,
+      base64Data: be(u),
+      name: s.protectedFile && s.protectedFile.name || r,
+      type: s.protectedFile && s.protectedFile.type || o,
       phash: s.phash || "",
       whash: s.whash || "",
       detections: s.detections || [],
@@ -2013,17 +1669,20 @@ const fr = {
       error: s.error
     };
   },
-  /**
-   * New Handler: Securely executes binary uploads to deployed Render production API from SW context
-   */
   REGISTER_BACKEND_ASSET: async (e) => {
-    if (!e || !e.storageKey)
-      throw new Error("Invalid payload: storageKey containing image buffer is mandatory");
-    const n = (await chrome.storage.session.get(e.storageKey))[e.storageKey];
-    if (await chrome.storage.session.remove(e.storageKey), !n)
-      throw new Error("Image data not found in background session allocation room");
-    const r = new Blob([n], { type: e.type || "image/png" }), o = new File([r], e.name || "upload.png", { type: e.type || "image/png" });
-    return console.log("[MessageRouter] Dispatching isolated proxy upload process via BridgeClient framework..."), await re.uploadProtectedAsset(o, {
+    if (!e || !e.storageKey && !e.base64Data)
+      throw new Error("Invalid payload: storageKey or base64Data containing image buffer is mandatory");
+    let t = null;
+    if (e.base64Data)
+      t = ne(e.base64Data);
+    else if (e.storageKey) {
+      const a = await chrome.storage.local.get(e.storageKey), i = a ? a[e.storageKey] : null;
+      typeof i == "string" ? t = ne(i) : i && i.byteLength && (t = i), t && await chrome.storage.local.remove(e.storageKey);
+    }
+    if (!t || !t.byteLength)
+      throw new Error("Image data not found or corrupted in background session allocation room");
+    const n = new Blob([t], { type: e.type || "image/png" }), r = new File([n], e.name || "upload.png", { type: e.type || "image/png" });
+    return console.log("[MessageRouter] Dispatching isolated proxy upload process via BridgeClient framework..."), await re.uploadProtectedAsset(r, {
       blur_enabled: e.blur_enabled,
       ai_cloak: e.ai_cloak,
       watermark: e.watermark
@@ -2040,36 +1699,39 @@ const fr = {
     }
     return { success: !0 };
   },
-  GET_SETTINGS: async () => (await chrome.storage.local.get("settings")).settings || {},
+  GET_SETTINGS: async () => {
+    const e = await chrome.storage.local.get("settings");
+    return e ? e.settings || {} : {};
+  },
   LOG_SCAN: async (e, t) => {
     if (!e || !e.scanId)
       throw new Error("Invalid scan log payload");
     let n;
     const r = new Promise((o) => {
-      we.then(() => o());
+      ve.then(() => o());
     });
-    we = new Promise((o) => {
+    ve = new Promise((o) => {
       n = o;
     }), await r;
     try {
-      const { scans: o = [] } = await chrome.storage.local.get("scans"), a = [e, ...o].slice(0, 100);
-      await chrome.storage.local.set({ scans: a });
+      const o = await chrome.storage.local.get("scans"), a = o && o.scans ? o.scans : [], i = [e, ...a].slice(0, 100);
+      await chrome.storage.local.set({ scans: i });
       try {
         if (await re.syncScanResult({
           metadata: { name: e.fileName, size: e.size, type: "image/png" },
           ...e
         }), e.riskLevel !== "low" && e.assetId) {
-          const s = t && (t.url || t.origin) || "unknown", l = await re.sendIncidentNotification({
+          const s = t && (t.url || t.origin) || "unknown", u = await re.sendIncidentNotification({
             assetId: e.assetId,
             matchedUrl: s,
             matchConfidence: e.confidence,
             severity: e.riskLevel === "critical" ? "Serious" : "Normal",
             status: "Open"
           });
-          if (l && l.success && l.incidentId) {
-            e.incidentId = l.incidentId;
-            const { scans: c = [] } = await chrome.storage.local.get("scans"), h = c.map((m) => m.scanId === e.scanId ? { ...m, incidentId: l.incidentId } : m);
-            await chrome.storage.local.set({ scans: h }), console.log("[MessageRouter] Linked local scan record with backend incident ID:", l.incidentId);
+          if (u && u.success && u.incidentId) {
+            e.incidentId = u.incidentId;
+            const h = await chrome.storage.local.get("scans"), c = (h && h.scans ? h.scans : []).map((g) => g.scanId === e.scanId ? { ...g, incidentId: u.incidentId } : g);
+            await chrome.storage.local.set({ scans: c }), console.log("[MessageRouter] Linked local scan record with backend incident ID:", u.incidentId);
           }
         }
       } catch (s) {
@@ -2081,7 +1743,7 @@ const fr = {
     return { success: !0 };
   }
 };
-async function ye() {
+async function xe() {
   if (!(typeof document > "u" && typeof chrome < "u" && chrome.offscreen) && !(typeof cv < "u" && cv.matFromImageData))
     return new Promise((e, t) => {
       let n = 0;
@@ -2090,7 +1752,7 @@ async function ye() {
       }, 100);
     });
 }
-async function hr(e, t) {
+async function er(e, t) {
   try {
     if (!e || typeof e != "object")
       return { success: !1, error: "Malformed message: Message must be an object" };
@@ -2098,7 +1760,7 @@ async function hr(e, t) {
     if (!n || typeof n != "string")
       return { success: !1, error: "Malformed message: Missing type property" };
     console.log(`[MessageRouter] Routing message type: ${n}`, { senderId: t.id, origin: t.origin });
-    const o = fr[n];
+    const o = Qt[n];
     return o ? { success: !0, data: await o(r, t) } : (console.warn(`[MessageRouter] Unknown message type: ${n}`), { success: !1, error: `Unknown message type: '${n}'` });
   } catch (n) {
     return console.error("[MessageRouter] Error routing message:", n), {
@@ -2107,12 +1769,11 @@ async function hr(e, t) {
     };
   }
 }
-chrome.storage.session && chrome.storage.session.setAccessLevel && (chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" }), console.log("[ServiceWorker] chrome.storage.session.setAccessLevel() executed"));
 chrome.runtime.onInstalled.addListener(async (e) => {
   if (console.log(`[ServiceWorker] Extension installation event: ${e.reason}`), e.reason === "install")
     try {
       (await chrome.storage.local.get("settings")).settings || (await chrome.storage.local.set({
-        settings: ke,
+        settings: Re,
         scans: []
         // Initialize scan log history
       }), console.log("[ServiceWorker] Default settings storage initialized."));
@@ -2121,15 +1782,39 @@ chrome.runtime.onInstalled.addListener(async (e) => {
     }
   else e.reason === "update" && console.log("[ServiceWorker] SafeLens successfully updated to new version.");
 });
-chrome.runtime.onMessage.addListener((e, t, n) => (console.log("[ServiceWorker] Raw onMessage received:", e ? e.type : "unknown"), hr(e, t).then((r) => {
-  if (r && r.success && r.payload) {
-    const o = r.payload;
-    console.log("===== RESULT FROM OFFSCREEN ====="), console.log(o), console.log(o.data), console.log(o.data?.constructor?.name), console.log(o.data?.byteLength), console.log(o.data?.length);
+chrome.runtime.onMessage.addListener((e, t, n) => {
+  if (console.log("[ServiceWorker] Raw onMessage received:", e ? e.type : "unknown"), e && e.target === "offscreen")
+    return !1;
+  let r = !1;
+  const o = (s) => {
+    if (!r) {
+      r = !0, a && clearInterval(a), i && clearTimeout(i);
+      try {
+        n(s);
+      } catch (u) {
+        console.error("[ServiceWorker] Failed to execute sendResponse (channel may be dead):", u);
+      }
+    }
+  }, a = setInterval(() => {
+    chrome.runtime && chrome.runtime.getPlatformInfo && chrome.runtime.getPlatformInfo();
+  }, 2e4), i = setTimeout(() => {
+    console.warn("[ServiceWorker] Message routing timed out (240s). Forcefully resolving channel."), o({ success: !1, error: "Background async processing timeout (240s)" });
+  }, 24e4);
+  try {
+    er(e, t).then((s) => {
+      if (s && s.success && s.payload) {
+        const u = s.payload;
+        console.log("===== RESULT FROM OFFSCREEN ====="), console.log(u), console.log(u.data), console.log(u.data?.constructor?.name), console.log(u.data?.byteLength), console.log(u.data?.length);
+      }
+      o(s);
+    }).catch((s) => {
+      console.error("[ServiceWorker] Message routing failure:", s), o({
+        success: !1,
+        error: s instanceof Error ? s.message : "Async processing exception"
+      });
+    });
+  } catch (s) {
+    console.error("[ServiceWorker] Synchronous crash during routing:", s), o({ success: !1, error: "Synchronous routing crash: " + s.message });
   }
-  n(r);
-}).catch((r) => {
-  console.error("[ServiceWorker] Message routing failure:", r), n({
-    success: !1,
-    error: r instanceof Error ? r.message : "Async processing exception"
-  });
-}), !0));
+  return !0;
+});

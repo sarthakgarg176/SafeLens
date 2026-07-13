@@ -36,7 +36,7 @@ export async function toGrayscale(canvas) {
       throw new Error('OpenCV.js runtime is not loaded');
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     // 1. Allocate WebAssembly Mat buffers
@@ -56,7 +56,7 @@ export async function toGrayscale(canvas) {
     outputCanvas.width = canvas.width;
     outputCanvas.height = canvas.height;
 
-    const outCtx = outputCanvas.getContext('2d');
+    const outCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
     const outImgData = new ImageData(new Uint8ClampedArray(rgbaMat.data), rgbaMat.cols, rgbaMat.rows);
     outCtx.putImageData(outImgData, 0, 0);
 
@@ -67,7 +67,7 @@ export async function toGrayscale(canvas) {
     
     // Graceful Fallback: JS-based Luminosity Formula (0.299R + 0.587G + 0.114B)
     try {
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
 
@@ -88,7 +88,7 @@ export async function toGrayscale(canvas) {
       fallbackCanvas.width = canvas.width;
       fallbackCanvas.height = canvas.height;
       
-      fallbackCanvas.getContext('2d').putImageData(imgData, 0, 0);
+      fallbackCanvas.getContext('2d', { willReadFrequently: true }).putImageData(imgData, 0, 0);
       return fallbackCanvas;
     } catch (fallbackError) {
       console.error('[Grayscale] JS grayscale fallback failed. Returning original image.', fallbackError);

@@ -41,14 +41,14 @@ window.addEventListener('message', async (event) => {
       canvas.width = width;
       canvas.height = height;
 
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const imgData = new ImageData(new Uint8ClampedArray(data), width, height);
       ctx.putImageData(imgData, 0, 0);
 
       console.log('[Sandbox] Executing preprocessImage()...');
       const preprocessedCanvas = await preprocessImage(canvas, options);
 
-      const outCtx = preprocessedCanvas.getContext('2d');
+      const outCtx = preprocessedCanvas.getContext('2d', { willReadFrequently: true });
       const outImgData = outCtx.getImageData(0, 0, preprocessedCanvas.width, preprocessedCanvas.height);
       
       const outputArray = Array.from(outImgData.data);

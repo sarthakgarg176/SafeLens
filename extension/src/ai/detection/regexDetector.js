@@ -1,20 +1,5 @@
 /**
- * Regex Pattern Detector
- * 
- * Responsibility:
- * - Scans unstructured text for high-risk PII and credential patterns.
- * - Supports matching for: Emails, Phone numbers, Aadhaar cards, PAN cards, Passports, 
- *   Driving Licenses, IFSC codes, Credit/Debit cards, UPI IDs, AWS/Google/GitHub keys,
- *   JWT tokens, and standard password expressions.
- * - Protects against ReDoS (Regular Expression Denial of Service) by using non-backtracking patterns.
- * - Resolves string index ranges back to word-level bounding box coordinates.
- * 
- * Input/Output Contract:
- * - Input: text (string), wordBoxes (Object[])
- * - Output: Object[] (List of detections: { type, value, confidence, startIndex, endIndex, bboxes })
- * 
- * Interacts with:
- * - extension/src/ai/detection/confidenceFusion.js
+ * Regex Pattern Detector - Diagnostic Mode
  */
 
 const PATTERNS = {
@@ -34,112 +19,58 @@ const PATTERNS = {
   PASSWORD_PATTERNS: /\b(?:password|passwd|secret|passphrase)\s*[:=]\s*([a-zA-Z0-9!@#$%^&*()_+=-]{6,30})\b/gi
 };
 
-// Base regex confidence values based on specificity
-const CONFIDENCES = {
-  EMAIL: 0.95,
-  PHONE: 0.85,
-  AADHAAR: 0.90,
-  PAN: 0.95,
-  PASSPORT: 0.90,
-  DRIVING_LICENSE: 0.90,
-  IFSC: 0.95,
-  CREDIT_CARD: 0.80, // Needs Luhn check to boost
-  UPI_ID: 0.90,
-  AWS_ACCESS_KEY: 0.99,
-  GOOGLE_API_KEY: 0.99,
-  GITHUB_PAT: 0.99,
-  JWT_TOKEN: 0.95,
-  PASSWORD_PATTERNS: 0.85
-};
+const normalize = (str) => (str || '').replace(/[\s\-_]/g, '').toLowerCase();
 
-/**
- * Scans text for sensitive patterns and aligns match bounds to coordinate boxes.
- * 
- * @param {string} text - Scanned text
- * @param {Object[]} wordBoxes - Word coordinates from OCR step
- * @returns {Object[]} List of matches
- */
 export function scanText(text, wordBoxes = []) {
-  if (!text) {
-    return [];
-  }
+  if (!text) return [];
+  
+  // DIAGNOSTIC LOG: Print once to see what structure we are working with
+  console.log('[RegexDetector] Inspecting first 3 wordBoxes structure:', wordBoxes.slice(0, 3));
 
-  console.log('[RegexDetector] Running sensitivity patterns scanning...');
   const detections = [];
-
-  // Align word bounding boxes with raw text index offsets
-  const alignedWords = alignWordsWithText(text, wordBoxes);
-
+  
   for (const [type, regex] of Object.entries(PATTERNS)) {
-    regex.lastIndex = 0; // Reset state
+    regex.lastIndex = 0; 
     let match;
 
     while ((match = regex.exec(text)) !== null) {
       const matchText = match[0];
-      const startIndex = match.index;
-      const endIndex = startIndex + matchText.length;
+      const matchNormValue = normalize(matchText);
+      
+      const associatedBboxes = wordBoxes
+        .filter(w => {
+          // Check all potential keys for text
+          const wText = (w.text || w.word || w.value || w.content || '').toString().trim();
+          if (!wText) return false;
+          
+          const wTextNorm = normalize(wText);
+          return matchNormValue.includes(wTextNorm) || wTextNorm.includes(matchNormValue);
+        })
+        .map(extractBox);
 
-      // Extract bounding boxes overlapping this index range
-      const associatedBboxes = alignedWords
-        .filter((w) => w.startIndex < endIndex && w.endIndex > startIndex)
-        .map((w) => ({
-          x: w.x,
-          y: w.y,
-          width: w.width,
-          height: w.height,
-          confidence: w.confidence
-        }));
-
-      // Calculate average OCR confidence for these boxes
-      const avgOcrConfidence = associatedBboxes.length > 0
-        ? associatedBboxes.reduce((acc, box) => acc + box.confidence, 0) / associatedBboxes.length
-        : 0;
+      if (associatedBboxes.length === 0) {
+        console.warn(`[RegexDetector] Mapping FAILED for: "${matchText}".`);
+      }
 
       detections.push({
         type,
         value: matchText,
-        regexConfidence: CONFIDENCES[type] || 0.80,
-        ocrConfidence: avgOcrConfidence / 100, // Normalize to 0.0 - 1.0
-        startIndex,
-        endIndex,
         bboxes: associatedBboxes,
         source: 'regex'
       });
     }
   }
-
   return detections;
 }
 
-/**
- * Aligns raw OCR words array to index offsets inside the full raw text string.
- * This handles line breaks and space insertions.
- * 
- * @param {string} rawText - OCR text
- * @param {Object[]} wordBoxes - Word bounding boxes
- * @returns {Object[]} Words aligned with start/end index parameters
- */
-function alignWordsWithText(rawText, wordBoxes) {
-  let currentIndex = 0;
-
-  return wordBoxes.map((w) => {
-    if (!w.text) {
-      return { ...w, startIndex: -1, endIndex: -1 };
-    }
-
-    // Clean word segment to search
-    const cleanWord = w.text.trim();
-    const startIndex = rawText.indexOf(cleanWord, currentIndex);
-
-    if (startIndex !== -1) {
-      currentIndex = startIndex + cleanWord.length;
-      return {
-        ...w,
-        startIndex,
-        endIndex: currentIndex
-      };
-    }
-
-    return { ...w, startIndex: -1, endIndex: -1 };
-  });
+function extractBox(w) {
+  // Check for common OCR box formats (bbox, x0/y0, etc)
+  const rect = w.bbox || w;
+  return {
+    x: rect.x !== undefined ? rect.x : (rect.x0 || 0),
+    y: rect.y !== undefined ? rect.y : (rect.y0 || 0),
+    width: rect.width !== undefined ? rect.width : ((rect.x1 || 0) - (rect.x0 || 0)),
+    height: rect.height !== undefined ? rect.height : ((rect.y1 || 0) - (rect.y0 || 0)),
+    confidence: w.confidence || 100
+  };
 }

@@ -40,7 +40,7 @@ export async function deskewCanvas(canvas) {
       throw new Error('OpenCV.js runtime is not loaded');
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     // 1. Allocate WebAssembly Mat buffers
@@ -112,7 +112,7 @@ export async function deskewCanvas(canvas) {
     outputCanvas.width = canvas.width;
     outputCanvas.height = canvas.height;
 
-    const outCtx = outputCanvas.getContext('2d');
+    const outCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
     const outImgData = new ImageData(new Uint8ClampedArray(rotated.data), rotated.cols, rotated.rows);
     outCtx.putImageData(outImgData, 0, 0);
 

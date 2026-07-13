@@ -495,3 +495,320 @@ pm run build and verified the following:
    - **Why**: This instructs Vite to treat sandbox.html as a primary entry point. When building, Vite parses the HTML, automatically bundles the referenced sandbox.js dependency into the optimized dist/assets/ directory, and emits a rewritten sandbox.html into dist/public/ that points to the production bundle. This single change elegantly fixed all production asset issues without requiring hacky manual scripts.
 
 *(No application logic, preprocessing steps, or sandbox.html source files were modified, preserving parity with development).*
+
+ # # #   U s e r : 
+ I   a m   g e t t i n g   t h e   f o l l o w i n g   C h r o m i u m   o p t i m i z a t i o n   w a r n i n g   i n   t h e   e x t e n s i o n   o f f s c r e e n   c o n t e x t : 
+ " C a n v a s 2 D :   M u l t i p l e   r e a d b a c k   o p e r a t i o n s   u s i n g   g e t I m a g e D a t a   a r e   f a s t e r   w i t h   t h e   w i l l R e a d F r e q u e n t l y   a t t r i b u t e   s e t   t o   t r u e . " 
+ 
+ P l e a s e   s c a n   t h e   c o d e b a s e   a n d   l o c a t e   a l l   f i l e s   w h e r e   a   2 D   c a n v a s   c o n t e x t   i s   b e i n g   i n i t i a l i z e d   u s i n g   ` . g e t C o n t e x t (  
+ \ 2 d \ ' ) ` .   
+ 
+ S t r i c t l y   f o l l o w   t h e s e   r u l e s : 
+ 1 .   D O   N O T   m o d i f y ,   r e f a c t o r ,   o r   e d i t   a n y   c o d e   f i l e s . 
+ 2 .   P r o v i d e   O N L Y   t h e   f i l e   p a t h s   a n d   t h e   a p p r o x i m a t e   l i n e   n u m b e r s   w h e r e   ` . g e t C o n t e x t ( \ 2 d \ ' ) `   i s   f o u n d . 
+ 3 .   L i s t   t h e   l o c a t i o n s   c l e a r l y   s o   I   k n o w   e x a c t l y   w h e r e   I   n e e d   t o   a d d   t h e   ` {   w i l l R e a d F r e q u e n t l y :   t r u e   } `   c o n t e x t   a t t r i b u t e   m a n u a l l y . 
+ 
+ # # #   A g e n t : 
+ H e r e   i s   t h e   c o m p l e t e   l i s t   o f   f i l e s   a n d   a p p r o x i m a t e   l i n e   n u m b e r s   w h e r e   a   2 D   c a n v a s   c o n t e x t   i s   b e i n g   i n i t i a l i z e d   u s i n g   ` . g e t C o n t e x t ( \ 2 d \ ' ) ` .   Y o u   c a n   a d d   ` {   w i l l R e a d F r e q u e n t l y :   t r u e   } `   a t   t h e s e   l o c a t i o n s : 
+ 
+ # # #   B a c k g r o u n d   &   S e r v i c e s 
+ -   ` e x t e n s i o n / s r c / s e r v i c e s / s c a n S e r v i c e . j s `   ( L i n e s :   4 5 ,   5 8 ) 
+ -   ` e x t e n s i o n / s r c / b a c k g r o u n d / o f f s c r e e n . j s `   ( L i n e :   8 0 ) 
+ -   ` e x t e n s i o n / s r c / b a c k g r o u n d / s a n d b o x . j s `   ( L i n e s :   4 4 ,   5 1 ) 
+ -   ` e x t e n s i o n / s r c / b a c k g r o u n d / m e s s a g e R o u t e r . j s `   ( L i n e :   2 6 ) 
+ 
+ # # #   A I   C o r e   &   P i p e l i n e s 
+ -   ` e x t e n s i o n / s r c / a i / o c r / r e c o g n i z e I m a g e . j s `   ( L i n e :   3 7 ) 
+ 
+ # # #   A I   P r e p r o c e s s i n g 
+ -   ` e x t e n s i o n / s r c / a i / p r e p r o c e s s i n g / p r e p r o c e s s I m a g e . j s `   ( L i n e s :   1 7 ,   4 9 ) 
+ -   ` e x t e n s i o n / s r c / a i / p r e p r o c e s s i n g / r e s i z e . j s `   ( L i n e s :   6 3 ,   8 1 ,   1 1 1 ) 
+ -   ` e x t e n s i o n / s r c / a i / p r e p r o c e s s i n g / g r a y s c a l e . j s `   ( L i n e s :   3 9 ,   5 9 ,   7 0 ,   9 1 ) 
+ -   ` e x t e n s i o n / s r c / a i / p r e p r o c e s s i n g / d e s k e w . j s `   ( L i n e s :   4 3 ,   1 1 5 ) 
+ -   ` e x t e n s i o n / s r c / a i / p r e p r o c e s s i n g / d e n o i s e . j s `   ( L i n e s :   4 0 ,   5 8 ) 
+ -   ` e x t e n s i o n / s r c / a i / p r e p r o c e s s i n g / t h r e s h o l d . j s `   ( L i n e s :   4 4 ,   7 6 ,   1 0 6 ,   1 2 3 ) 
+ 
+ # # #   A I   H a s h i n g 
+ -   ` e x t e n s i o n / s r c / a i / h a s h i n g / w a v e l e t H a s h . j s `   ( L i n e :   9 9 ) 
+ -   ` e x t e n s i o n / s r c / a i / h a s h i n g / p e r c e p t u a l H a s h . j s `   ( L i n e :   4 2 ) 
+ 
+ # # #   A I   P r o t e c t i o n   ( B l u r ,   R e d a c t ,   C l o a k ,   W a t e r m a r k ) 
+ -   ` e x t e n s i o n / s r c / a i / b l u r / r e d a c t C a n v a s . j s `   ( L i n e s :   4 3 ,   9 2 ,   1 2 9 ) 
+ -   ` e x t e n s i o n / s r c / a i / b l u r / b l u r C a n v a s . j s `   ( L i n e s :   3 4 ,   5 8 ) 
+ -   ` e x t e n s i o n / s r c / a i / c l o a k i n g / p e r t u r b a t i o n . j s `   ( L i n e s :   3 1 ,   6 6 ) 
+ -   ` e x t e n s i o n / s r c / a i / w a t e r m a r k / w a t e r m a r k E n g i n e . j s `   ( L i n e s :   8 2 ,   1 8 5 ) 
+ 
+ # # #   U s e r : 
+ P l e a s e   g o   t h r o u g h   t h e   l i s t   o f   c a n v a s   i n i t i a l i z a t i o n   p o i n t s   y o u   j u s t   f o u n d .   U p d a t e   t h e   ` . g e t C o n t e x t ( \ 2 d \ ' ) `   c a l l s   i n   a l l   l i s t e d   f i l e s   t o   i n c l u d e   t h e   p e r f o r m a n c e   a t t r i b u t e   ` {   w i l l R e a d F r e q u e n t l y :   t r u e   } ` . 
+ 
+ E x a m p l e   t r a n s f o r m a t i o n : 
+ F r o m :   c o n s t   c t x   =   c a n v a s . g e t C o n t e x t ( \ 2 d \ ' ) ; 
+ T o :   c o n s t   c t x   =   c a n v a s . g e t C o n t e x t ( \ 2 d \ ' ,   {   w i l l R e a d F r e q u e n t l y :   t r u e   } ) ; 
+ 
+ A p p l y   t h i s   o p t i m i z a t i o n   t o : 
+ 1 .   e x t e n s i o n / s r c / s e r v i c e s / s c a n S e r v i c e . j s 
+ 2 .   e x t e n s i o n / s r c / b a c k g r o u n d / o f f s c r e e n . j s 
+ 3 .   e x t e n s i o n / s r c / b a c k g r o u n d / s a n d b o x . j s 
+ 4 .   e x t e n s i o n / s r c / b a c k g r o u n d / m e s s a g e R o u t e r . j s 
+ 5 .   e x t e n s i o n / s r c / a i / o c r / r e c o g n i z e I m a g e . j s 
+ 6 .   A l l   l i s t e d   f i l e s   u n d e r   A I   P r e p r o c e s s i n g   ( p r e p r o c e s s I m a g e ,   r e s i z e ,   g r a y s c a l e ,   d e s k e w ,   d e n o i s e ,   t h r e s h o l d ) 
+ 7 .   A l l   l i s t e d   f i l e s   u n d e r   A I   H a s h i n g   ( w a v e l e t H a s h ,   p e r c e p t u a l H a s h ) 
+ 8 .   A l l   l i s t e d   f i l e s   u n d e r   A I   P r o t e c t i o n   ( r e d a c t C a n v a s ,   b l u r C a n v a s ,   p e r t u r b a t i o n ,   w a t e r m a r k E n g i n e ) 
+ 
+ M a k e   s u r e   t o   p r e s e r v e   a l l   e x i s t i n g   c o d e   l o g i c ,   i m p o r t s ,   a n d   v a r i a b l e s   e x a c t l y   a s   t h e y   a r e .   A f t e r   u p d a t i n g ,   p l e a s e   c o n f i r m   s o   I   c a n   r u n   t h e   b u i l d . 
+ 
+ R e v i e w   t h e   a t t a c h e d   m a r k d o w n   c h a t   h i s t o r y   f o r   c o n t i n u o u s   c o n t e x t ,   t h e n   r e p l y   t o   t h e   n e w   p r o m p t   b e l o w .   A f t e r   g e n e r a t i n g   y o u r   r e s p o n s e ,   i m m e d i a t e l y   i n v o k e   y o u r   f i l e   t o o l   t o   a p p e n d   t h i s   c u r r e n t   q u e r y   a n d   y o u r   e x a c t   r e p l y   i n t o   t h e   c h a t _ h i s t o r y . m d   f i l e . 
+ 
+ A l s o   u p d a t e   t h e   r e l e v a n t   f i l e s   i n s i d e   p r o m p t s /   t o   r e f l e c t   a n y   a r c h i t e c t u r a l   o r   i m p l e m e n t a t i o n   c h a n g e s   m a d e   i n   t h i s   m o d u l e . 
+ 
+ U p d a t e   o n l y   t h e   a f f e c t e d   p r o m p t   f i l e s . 
+ D o   n o t   c r e a t e   d u p l i c a t e s . 
+ 
+ # # #   A g e n t : 
+ I   h a v e   s u c c e s s f u l l y   a p p l i e d   t h e   ` {   w i l l R e a d F r e q u e n t l y :   t r u e   } `   o p t i m i z a t i o n   t o   a l l   i n s t a n c e s   o f   ` . g e t C o n t e x t ( \ 2 d \ ' ) `   a c r o s s   t h e   1 6   s p e c i f i e d   f i l e s .   
+ 
+ A l l   e x i s t i n g   c o d e   l o g i c ,   i m p o r t s ,   a n d   v a r i a b l e s   r e m a i n   c o m p l e t e l y   u n t o u c h e d .   Y o u   a r e   c l e a r   t o   r u n   y o u r   p r o d u c t i o n   b u i l d . 
+ 
+ ( N o   a r c h i t e c t u r a l   c h a n g e s   w e r e   m a d e   t h a t   r e q u i r e d   u p d a t i n g   t h e   ` p r o m p t s / `   f i l e s . ) 
+  
+ 
+### User:
+We are hitting Chrome's hard limit on message sizes during image processing pipelines:
+"TypeError: Error in invocation of runtime.sendMessage(...): Message exceeded maximum allowed size of 64MiB."
+
+This occurs because raw image data arrays or buffers are being passed directly in the payload or response of `chrome.runtime.sendMessage` inside the processing or OCR pipelines (`preprocessImage.js`, `recognizeImage.js`, and `serviceWorker.js`).
+
+Please inspect these files and apply the session storage pattern:
+1. Instead of passing massive raw pixel data arrays directly inside the message payload or returning them via the message channel, store the array buffer temporarily in `chrome.storage.session` using a dynamic unique key.
+2. Pass only the unique `storageKey` string string in the message payload.
+3. The receiving end should pull the buffer from `chrome.storage.session`, perform its task, and immediately clear the storage key to prevent memory leaks.
+
+Apply this change cleanly without altering the internal mathematical processing logic, thresholds, or OCR routines.
+
+Review the attached markdown chat history for continuous context, then reply to the new prompt below. After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+
+### Agent:
+I have successfully applied the session storage pattern for IPC data transfer across the OCR and image preprocessing pipelines to bypass Chrome's 64MiB message size limit.
+
+The following files have been updated:
+- `extension/src/ai/preprocessing/preprocessImage.js`: Now dynamically generates a `storageKey`, stores the raw pixel array in `chrome.storage.session`, passes the key instead of the array to the offscreen document, and retrieves the response array via a return storage key.
+- `extension/src/ai/ocr/recognizeImage.js`: Applies the exact same pattern, pushing the array payload into `chrome.storage.session` and dispatching the `storageKey`. 
+- `extension/src/background/offscreen.js`: Updated the message listeners for both `PREPROCESS_IMAGE` and `RECOGNIZE_IMAGE` to fetch the payload from `chrome.storage.session` using the provided `storageKey`, immediately purging the key from memory. It now also uses a dynamically generated `outputStorageKey` to return the sandbox results back to the background worker securely.
+
+These updates implement a lightweight, pointer-based IPC pattern that perfectly complies with MV3 limitations while preserving all internal rendering logic and fallback mechanisms.
+
+### User:
+The session storage fix is breaking inside the offscreen document context with the error:
+"TypeError: Cannot read properties of undefined (reading 'session')"
+
+This is because by default, `chrome.storage.session` is isolated from offscreen document contexts in Chrome MV3. We need to set the storage access level inside the service worker.
+
+Please update `extension/src/background/serviceWorker.js` (or your main background setup initialization file) to configure the session access level right at the top during extension installation/initialization:
+
+```javascript
+if (chrome.storage && chrome.storage.session && chrome.storage.session.setAccessLevel) {
+  chrome.storage.session.setAccessLevel({
+    accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS'
+  }).catch(err => console.error('[ServiceWorker] Failed to set storage access level:', err));
+}
+```
+
+Please apply this configuration patch, ensure the service worker exposes session storage access to the offscreen contexts, and confirm when done without modifying the internal pipeline algorithms.
+
+Review the attached markdown chat history for continuous context, then reply to the new prompt below. After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+
+### Agent:
+I have successfully applied the storage access configuration patch directly to `extension/src/background/serviceWorker.js`. 
+
+The top-level initialization now safely checks for the `chrome.storage` APIs and uses the Promise-based `.catch()` handler to ensure that the session storage context is successfully opened up to both trusted and untrusted contexts (like the Offscreen Document and Content Scripts).
+
+No internal processing pipelines or mathematical algorithms were modified, keeping your core architecture completely intact. 
+
+*(The conversation log has been appended to `chat_history.md`. No `prompts/` files were updated since this was an API-level syntax/error handling fix rather than a systemic architectural change).*
+
+### User:
+The extension context isolation error is still breaking on line 33 of `contentScript.js` during page transitions/extension reloads on WhatsApp Web:
+"[UploadInterceptor] Extension runtime context isolated. Bypassing worker communication."
+
+We need a permanent fix in `extension/src/content/uploadInterceptor.js` (and the compiled `contentScript.js`). Before executing `document.body.appendChild(e)` or setting up button event listeners (`sl-btn-protect`, etc.), wrap the entire DOM injection and message dispatch block inside a strict validation check. 
+
+Modify the implementation to strictly:
+1. Verify `if (!chrome.runtime || !chrome.runtime.id)` at the absolute beginning of `interceptUpload` and inside any DOM action event listener callbacks.
+2. Wrap the `chrome.runtime.sendMessage` and popup logic inside a clear `try-catch` block. If it catches the "Extension context invalidated" or "Context isolated from extension APIs" error, immediately and gracefully call `onApprovalCallback(files)` to fallback without throwing unhandled exceptions to the Chrome browser log.
+
+Apply this final safety wrapper now, keep the core business logic exactly identical, and let me know when it's done.
+
+After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+
+### Agent:
+I have successfully implemented the permanent safety wrappers to gracefully bypass the "Extension context invalidated" errors during Single Page Application transitions (like WhatsApp Web).
+
+The following changes were made:
+- `extension/src/content/uploadInterceptor.js`: Wrapped the core pipeline delegation and API messaging logic inside strict `try-catch` blocks. If a synchronous throw or Promise rejection contains the message "Extension context invalidated" or "Context isolated", it intercepts the exception and immediately invokes `onApprovalCallback(files)` to resume the upload silently, preventing unhandled console exceptions.
+- `extension/src/content/decisionPopup.js`: Inserted a strict validation check (`if (!chrome.runtime || !chrome.runtime.id)`) explicitly before injecting the DOM overlay (resolving safely to `'anyway'` if isolated) and inside the event listener callbacks for the popup buttons. 
+
+This ensures that the extension fails securely and invisibly if the background context drops while the user is interacting with the modal, without mutating the core mathematical upload business logic.
+
+*(The conversation log has been appended to `chat_history.md`.)*
+
+### User:
+You currently implemented a 'Fail-Open' approach that passes the original files if the extension context is invalidated. From a privacy perspective, this is a data leak. 
+
+Please modify `extension/src/content/uploadInterceptor.js` and `decisionPopup.js` to adopt a 'Fail-Secure' model:
+1. If `(!chrome.runtime || !chrome.runtime.id)` is triggered or an "Extension context invalidated" error is caught, DO NOT call `onApprovalCallback(files)`.
+2. Instead, completely block the upload flow by calling `onApprovalCallback([])` or simply blocking the execution path.
+3. Show a standard native web browser `alert("SafeLens Privacy Shield Alert: The extension background service is currently disconnected or updating. Outbound uploads have been securely blocked to prevent potential leaking of sensitive data. Please refresh the page to restart protection.")`.
+
+This ensures absolute data protection even during extension lifecycle state crashes.
+
+### Agent:
+I have successfully transitioned the interceptor and UI layers to a strict "Fail-Secure" privacy model.
+
+The following changes were implemented in `extension/src/content/uploadInterceptor.js` and `extension/src/content/decisionPopup.js`:
+- **Upload Blocked:** All fail-open fallbacks (`return onApprovalCallback(files)`) tied to context invalidation or isolation have been permanently replaced with `return onApprovalCallback([])`, ensuring 0 bytes of unverified data can escape the browser if the SafeLens Service Worker goes offline.
+- **Popup UI Fallback:** If the extension context drops *while* the user is interacting with the modal UI, the modal will no longer default to the "Upload Anyway" route. It will automatically route to `cancel` to block the transaction.
+- **Native Security Alert:** An explicit `alert()` dialog is now triggered synchronously across all these failure states, informing the user that the outbound network request was blocked due to an inactive extension state and instructing them to refresh the page.
+
+This guarantees maximum privacy integrity under all Single Page Application (SPA) reload and extension update edge cases.
+
+*(The conversation log has been appended to `chat_history.md`. No architectural paradigms were altered, so `prompts/` files remain up-to-date).*
+
+### User:
+The content script is throwing: "Error: Access to storage is not allowed from this context."
+This happens because chrome.storage.local cannot be accessed from the webpage/content script injection context on sites like WhatsApp Web, regardless of the file size.
+
+Please apply this definitive architectural fix:
+1. Completely remove all chrome.storage.local.set and .get calls from extension/src/content/uploadInterceptor.js. The content script must NOT touch extension storage APIs at all.
+2. Modify uploadInterceptor.js so that it sends the image data/Base64 directly inside the standard chrome.runtime.sendMessage payload to the background script.
+3. Update extension/src/background/messageRouter.js (under the RUN_PROTECT_PIPELINE handler) so that the background worker receives this incoming payload, generates the unique storageKey itself, and writes it to chrome.storage.local right there in the background context before talking to the offscreen document.
+
+This completely removes the storage dependency from the content script and fixes the permission error permanently.
+
+After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+
+### Agent:
+I have applied the definitive architectural fix to completely remove chrome.storage.local dependencies from the content script.
+
+1. **uploadInterceptor.js**: Removed all chrome.storage.local.set and .get calls. The content script now directly converts ArrayBuffers to Base64 and transmits them via the chrome.runtime.sendMessage payload.
+2. **messageRouter.js**: Updated the RUN_PROTECT_PIPELINE and REGISTER_BACKEND_ASSET handlers. The background service worker now receives the Base64 payload, generates a unique storage key itself, and securely writes it to chrome.storage.local before delegating to the processing pipeline. The processed image is returned via Base64.
+3. **prompts/**: Updated upload-interception.md and manifest-v3.md to reflect the new architecture—explicitly forbidding chrome.storage API usage in content scripts and enforcing Base64 string payload transfers instead.
+
+I have also appended this interaction to your chat_history.md file as requested.
+
+### User:
+Look at extension/src/content/contentScript.js. The global search shows it still contains 5 active references to chrome.storage.local and chrome.storage.session (e.g., fetching "settings"). This is causing the "Access to storage is not allowed from this context" crash on WhatsApp Web.
+
+Please completely refactor contentScript.js to remove all storage dependencies:
+1. Replace await chrome.storage.local.get("settings") with an async message call to the background worker:
+   const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
+   const settings = response.data || response;
+2. Remove any other chrome.storage.session.set or .get calls from this file entirely. If it needs to pass keys or data, route them structurally via chrome.runtime.sendMessage or payload states to messageRouter.js.
+3. Ensure contentScript.js does not invoke or import any module touching the chrome.storage API directly.
+
+Review the attached markdown chat history for continuous context, then reply to the new prompt below. After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+
+### Agent:
+I have successfully refactored extension/src/content/contentScript.js to completely remove all chrome.storage API dependencies.
+
+1. **Settings Fetching**: Replaced the chrome.storage.local.get call with an asynchronous message (GET_SETTINGS) to the background worker.
+2. **Payload Processing & Registration**: Replaced all chrome.storage.session.set and .get calls for pending_image_ and upload_image_ keys. I added utility functions (rrayBufferToBase64 and ase64ToArrayBuffer) to the IIFE block, allowing the script to encode the raw buffers as Base64 strings and pass them directly inside the chrome.runtime.sendMessage payloads for the RUN_PROTECT_PIPELINE and REGISTER_BACKEND_ASSET events.
+3. **Purity Maintained**: The compiled contentScript.js file now operates strictly via DOM events and message passing, ensuring it will no longer crash due to isolated context storage permission errors on secure domains like WhatsApp Web.
+
+I have updated the chat_history.md as requested. (No additional updates were required for the prompts/ directory, as the architectural mandates were already formalized in the previous step).
+
+### User:
+We are encountering a "RangeError: Maximum call stack size exceeded" during the image array processing phase.
+This is caused by String.fromCharCode.apply(null, ...) pushing too many individual arguments onto Chrome's execution stack, causing it to overflow.
+
+Please locate and update the arrayBufferToBase64 helper function across ALL active files (including extension/src/background/messageRouter.js, extension/src/content/contentScript.js, and extension/src/content/uploadInterceptor.js).
+
+Replace the old implementation with this completely iterative, stack-safe version that does NOT expand the execution stack:
+
+function arrayBufferToBase64(buffer) {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+Apply this change uniformly to ensure the encoding process remains entirely within safe memory boundaries.
+
+Review the attached markdown chat history for continuous context, then reply to the new prompt below. After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+
+### Agent:
+I have successfully replaced the rrayBufferToBase64 helper function with the iterative, stack-safe version across all specified files:
+1. extension/src/background/messageRouter.js
+2. extension/src/content/contentScript.js
+3. extension/src/content/uploadInterceptor.js
+
+By using a loop to concatenate the characters directly into the inary string rather than applying an array of thousands of arguments to String.fromCharCode, we ensure that the execution stack remains untouched, resolving the RangeError: Maximum call stack size exceeded crash regardless of the image array buffer size.
+
+I have appended this query and my reply to the chat_history.md file as requested. (No prompts files required updating, as this was a low-level algorithm optimization rather than a systemic architectural or policy shift).
+
+### User:
+Please search the entire codebase to identify the exact files responsible for the text-detection-to-redaction pipeline. 
+
+Based on my background service worker logs, the OCR successfully extracts bounding boxes:
+[ExtractBoundingBoxes] Compiling spatial coordinate box records...
+
+However, during the final protection phase, the Blur service fails to find these coordinates for the detected sensitive text:
+[ProtectService] Applying visual protections (Mode: redact)...
+[BlurService] No bounding boxes found in detections. Skipping redaction.
+
+Your Task:
+1. Locate the file that handles RegexDetector or the main detection engine (Look for the log string: "Running sensitivity patterns scanning...").
+2. Locate the file handling the redaction (likely BlurService.js or redact.js), specifically where the "No bounding boxes found" log is printed.
+3. Locate the orchestrator file (likely ProtectService.js or ScanService.js) that bridges the detections array from the scanner to the BlurService.
+
+CRITICAL STRICT DIRECTIVE: 
+DO NOT write, modify, fix, or suggest any code changes whatsoever. Your ONLY job is to search the workspace and return the exact file names and their relative paths so I can review the data flow manually.
+
+### Agent:
+Based on my search of the workspace, here are the exact files responsible for the data flow you are debugging:
+
+1. **Main Detection Engine (RegexDetector):**
+   - **Path:** extension/src/ai/detection/regexDetector.js
+   - *(Located via the "Running sensitivity patterns scanning..." log on line 67).*
+
+2. **Redaction/Blur Logic:**
+   - **Path:** extension/src/services/blurService.js
+   - *(Located via the "No bounding boxes found in detections. Skipping redaction." log on line 53).*
+
+3. **Orchestrator:**
+   - **Path:** extension/src/services/protectService.js
+   - *(Located via the "Applying visual protections" log on line 155. This file bridges the scanning pipeline and the blur service).*
+
+I have not modified or suggested any code changes, as per your strict directive. The chat_history.md has also been updated with this interaction.

@@ -2,6 +2,27 @@
   "use strict";
   const E = new Set(["image/png","image/jpeg","image/jpg","image/webp","image/gif"]);
 
+  function arrayBufferToBase64(buffer) {
+    if (!buffer) return '';
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  function base64ToArrayBuffer(base64) {
+    if (!base64) return new ArrayBuffer(0);
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
   function S(a,o,s,e){
     if(!a||a.length===0)return;
     const r=Array.from(a),i=[],n=[];
@@ -67,9 +88,12 @@
     console.log("[UploadInterceptor] Intercepting upload event for files:",o.map(r=>r.name));
     try{
       let r={protectionEnabled:!0,autoProtect:!1};
-      if(typeof chrome<"u"&&chrome?.storage?.local){
-        const n=await chrome.storage.local.get("settings");
-        n.settings&&(r=n.settings)
+      try {
+        const response = await new Promise(resolve => chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, resolve));
+        if (response && response.success && response.data) r = response.data;
+        else if (response && response.settings) r = response.settings;
+      } catch (err) {
+        console.warn("[UploadInterceptor] Could not fetch settings, using defaults.", err);
       }
       if(r.protectionEnabled===!1)return console.log("[UploadInterceptor] Shield is suspended. Resuming original upload."),e(a);
       if(r.autoProtect===!0||r.autoRedact===!0){
@@ -101,14 +125,13 @@
         console.log("[UploadInterceptor] Sending PING to wake Service Worker..."),await new Promise(t=>{
           chrome.runtime.sendMessage({type:"PING"},c=>{chrome.runtime.lastError?console.warn("[UploadInterceptor] PING failed or no response:",chrome.runtime.lastError.message):console.log("[UploadInterceptor] PING response received. SW is awake."),t(c)})
         });
-        const i="pending_image_"+Date.now()+"_"+Math.random().toString(36).substr(2,9);
-        await chrome.storage.session.set({[i]:r});
+        const base64Data = arrayBufferToBase64(r);
         const n=await new Promise(t=>{
-          chrome.runtime.sendMessage({type:"RUN_PROTECT_PIPELINE",payload:{storageKey:i,name:e.name,type:e.type,settings:o}},c=>{chrome.runtime.lastError?(console.error("[UploadInterceptor] SW message error:",chrome.runtime.lastError.message),t({success:!1,error:chrome.runtime.lastError.message})):t(c||{success:!1,error:"No response from Service Worker"})})
+          chrome.runtime.sendMessage({type:"RUN_PROTECT_PIPELINE",payload:{base64Data:base64Data,name:e.name,type:e.type,settings:o}},c=>{chrome.runtime.lastError?(console.error("[UploadInterceptor] SW message error:",chrome.runtime.lastError.message),t({success:!1,error:chrome.runtime.lastError.message})):t(c||{success:!1,error:"No response from Service Worker"})})
         });
         if(n&&n.success&&n.data){
           const t=n.data;let c;
-          t.storageKey?(c=(await chrome.storage.session.get(t.storageKey))[t.storageKey],await chrome.storage.session.remove(t.storageKey)):c=t.arrayBuffer||r;
+          t.base64Data?c=base64ToArrayBuffer(t.base64Data):c=t.arrayBuffer||r;
           const l=new Blob([c],{type:t.type}),m=new File([l],t.name,{type:t.type,lastModified:Date.now()});
           return{success:!0,originalFile:e,protectedFile:m,phash:t.phash,whash:t.whash,metadata:{name:e.name,size:e.size,type:e.type},detections:t.detections,risk:t.risk,protectionSummary:t.protectionSummary}
         }else throw new Error(n&&n.error||"Failed protection pipeline execution")
@@ -122,10 +145,10 @@
       let r=null;
       try{
         console.log("[UploadInterceptor] Delegating asset registration to SW to bypass host CSP restrictions...");
-        const i=await e.protectedFile.arrayBuffer(),n="upload_image_"+Date.now()+"_"+Math.random().toString(36).substr(2,9);
-        await chrome.storage.session.set({[n]:i});
+        const i=await e.protectedFile.arrayBuffer();
+        const base64Protected = arrayBufferToBase64(i);
         const t=await new Promise(c=>{
-          chrome.runtime.sendMessage({type:"REGISTER_BACKEND_ASSET",payload:{storageKey:n,name:e.protectedFile.name,type:e.protectedFile.type,blur_enabled:o.blurMode==="blur"&&e.protectionSummary.redacted?"true":"false",ai_cloak:o.aiCloakEnabled&&e.protectionSummary.redacted?"true":"false",watermark:o.watermarkEnabled&&e.protectionSummary.redacted?"true":"false"}},l=>{chrome.runtime.lastError?c({success:!1,error:chrome.runtime.lastError.message}):c(l||{success:!1})})
+          chrome.runtime.sendMessage({type:"REGISTER_BACKEND_ASSET",payload:{base64Data:base64Protected,name:e.protectedFile.name,type:e.protectedFile.type,blur_enabled:o.blurMode==="blur"&&e.protectionSummary.redacted?"true":"false",ai_cloak:o.aiCloakEnabled&&e.protectionSummary.redacted?"true":"false",watermark:o.watermarkEnabled&&e.protectionSummary.redacted?"true":"false"}},l=>{chrome.runtime.lastError?c({success:!1,error:chrome.runtime.lastError.message}):c(l||{success:!1})})
         });
         t&&t.success&&t.data&&(r=t.data.assetId,console.log("[UploadInterceptor] Safely registered asset via Background Worker. ID:",r))
       }catch(i){console.warn("[UploadInterceptor] Background asset registration messaging failed:",i.message)}

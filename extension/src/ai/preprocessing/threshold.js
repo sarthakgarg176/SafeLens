@@ -41,7 +41,7 @@ export async function applyThreshold(canvas, thresholdValue = 127) {
       throw new Error('OpenCV.js runtime is not loaded');
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     // 1. Allocate WebAssembly Mat buffers
@@ -73,7 +73,7 @@ export async function applyThreshold(canvas, thresholdValue = 127) {
     outputCanvas.width = canvas.width;
     outputCanvas.height = canvas.height;
 
-    const outCtx = outputCanvas.getContext('2d');
+    const outCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
     const outImgData = new ImageData(new Uint8ClampedArray(rgbaMat.data), rgbaMat.cols, rgbaMat.rows);
     outCtx.putImageData(outImgData, 0, 0);
 
@@ -103,7 +103,7 @@ export async function applyThreshold(canvas, thresholdValue = 127) {
  * Lightweight JavaScript grayscale fallback.
  */
 async function fallbackToGrayscale(canvas) {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
 
@@ -120,6 +120,6 @@ async function fallbackToGrayscale(canvas) {
   fallbackCanvas.width = canvas.width;
   fallbackCanvas.height = canvas.height;
   
-  fallbackCanvas.getContext('2d').putImageData(imgData, 0, 0);
+  fallbackCanvas.getContext('2d', { willReadFrequently: true }).putImageData(imgData, 0, 0);
   return fallbackCanvas;
 }

@@ -39,7 +39,7 @@ export async function generatePHash(canvas) {
     tempCanvas.width = DCT_SIZE;
     tempCanvas.height = DCT_SIZE;
 
-    const ctx = tempCanvas.getContext('2d');
+    const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(canvas, 0, 0, DCT_SIZE, DCT_SIZE);
 
     const imgData = ctx.getImageData(0, 0, DCT_SIZE, DCT_SIZE);
