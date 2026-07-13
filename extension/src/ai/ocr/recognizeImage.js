@@ -31,7 +31,7 @@ export async function recognizeImage(canvas) {
         width: canvas.width, height: canvas.height, base64Data
       });
 
-      // 2. THE FIX: Offscreen already extracted everything. Do NOT re-extract!
+      // 2. Offscreen already extracted everything. Do NOT re-extract!
       console.log(`[RecognizeImage] Received from Offscreen. Boxes: ${offscreenResult?.boundingBoxes?.length || 0}`);
       return offscreenResult;
     } 
@@ -40,15 +40,56 @@ export async function recognizeImage(canvas) {
     // PATH 2: OFFSCREEN DOCUMENT / CONTENT SCRIPT (Runs actual OCR)
     // ==========================================
     else {
+      console.log('[RecognizeImage] Starting Tesseract OCR process...');
       const ocrResult = await runOCROnWorker(canvas);
       const data = ocrResult.data || ocrResult;
 
-      // Defensive Parsing
+      // ---------------------------------------------------------
+      // 🕵️‍♂️ DEEP DEBUG LOGS
+      // ---------------------------------------------------------
+      console.log('================ RAW TESSERACT DATA ================');
+      console.log('[DEBUG] Keys present in Tesseract data:', Object.keys(data));
+      console.log('[DEBUG] Text Length:', data.text ? data.text.length : 0);
+      console.log('[DEBUG] Natively has words array?', !!data.words, 'Count:', data.words ? data.words.length : 0);
+      console.log('[DEBUG] Natively has lines array?', !!data.lines, 'Count:', data.lines ? data.lines.length : 0);
+      console.log('[DEBUG] Natively has blocks array?', !!data.blocks, 'Count:', data.blocks ? data.blocks.length : 0);
+      console.log('====================================================');
+      
+      // ---------------------------------------------------------
+      // 🛡️ THE ULTIMATE DEFENSIVE PARSING (Deep Traversal)
+      // ---------------------------------------------------------
       let words = data.words || [];
-      if (words.length === 0 && data.lines) {
+
+      // Level 1 Fallback: Try getting words from lines
+      if (words.length === 0 && data.lines && data.lines.length > 0) {
+         console.log('[RecognizeImage] Native words empty. Extracting from lines...');
          data.lines.forEach(line => { if (line.words) words.push(...line.words); });
       }
 
+      // Level 2 Fallback: Try getting words from blocks (THIS WILL FIX THE ISSUE)
+      if (words.length === 0 && data.blocks && data.blocks.length > 0) {
+         console.log('[RecognizeImage] Native words & lines empty. Extracting deeply from blocks...');
+         data.blocks.forEach(block => {
+             if (block.paragraphs) {
+                 block.paragraphs.forEach(para => {
+                     if (para.lines) {
+                         para.lines.forEach(line => {
+                             if (line.words) words.push(...line.words);
+                         });
+                     }
+                 });
+             }
+         });
+      }
+      
+      console.log(`[RecognizeImage] Final Extracted Words Count: ${words.length}`);
+
+      console.log('[RecognizeImage] Extracting bounding boxes...');
+      
+      // HACK: Pass the extracted words array explicitly to extractBoundingBoxes if needed
+      // By overwriting data.words, we ensure extractBoundingBoxes can find them
+      data.words = words; 
+      
       const boundingBoxes = extractBoundingBoxes(data);
       console.log(`[RecognizeImage] OCR Local Success. Words: ${words.length}. Boxes: ${boundingBoxes.length}`);
 

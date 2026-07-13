@@ -2,6 +2,7 @@ import { preprocessImage } from '../ai/preprocessing/preprocessImage.js';
 
 console.log('[Sandbox] Sandbox loaded and initializing...');
 
+// Waits for the OpenCV library to initialize fully
 async function waitForOpenCV() {
   if (typeof cv !== 'undefined' && cv.matFromImageData) {
     return;
@@ -21,6 +22,34 @@ async function waitForOpenCV() {
   });
 }
 
+// Calculates image brightness and inverts colors if dark mode is detected
+function applySmartInvert(ctx, width, height) {
+  const imgData = ctx.getImageData(0, 0, width, height);
+  const data = imgData.data;
+  let totalBrightness = 0;
+
+  // Calculate luminance for each pixel
+  for (let i = 0; i < data.length; i += 4) {
+    const brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    totalBrightness += brightness;
+  }
+
+  const avgBrightness = totalBrightness / (width * height);
+  console.log(`[Sandbox] Image average brightness: ${avgBrightness.toFixed(2)}`);
+
+  // Threshold for dark mode (100 out of 255)
+  if (avgBrightness < 100) {
+    console.log('[Sandbox] Dark mode detected. Inverting colors for OCR compatibility...');
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 255 - data[i];         // Red
+      data[i + 1] = 255 - data[i + 1]; // Green
+      data[i + 2] = 255 - data[i + 2]; // Blue
+      // Alpha channel data[i+3] remains untouched
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+}
+
 waitForOpenCV()
   .then(() => console.log('[Sandbox] OpenCV.js is fully loaded and ready.'))
   .catch((err) => console.error('[Sandbox] OpenCV.js initialization error:', err));
@@ -29,9 +58,6 @@ window.addEventListener('message', async (event) => {
   if (event.data && event.data.type === 'PREPROCESS_IMAGE') {
     console.log('[Sandbox] PREPROCESS_IMAGE message received.');
     
-    console.log("IsArray?", Array.isArray(event.data.payload.data));
-    console.log("Length =", event.data.payload.data?.length);
-
     const { width, height, data, options, messageId } = event.data.payload;
 
     try {
@@ -45,13 +71,17 @@ window.addEventListener('message', async (event) => {
       const imgData = new ImageData(new Uint8ClampedArray(data), width, height);
       ctx.putImageData(imgData, 0, 0);
 
+      // 🚀 SMART INVERSION: Fixes dark mode screenshots before preprocessing
+      applySmartInvert(ctx, width, height);
+
       console.log('[Sandbox] Executing preprocessImage()...');
       const preprocessedCanvas = await preprocessImage(canvas, options);
 
       const outCtx = preprocessedCanvas.getContext('2d', { willReadFrequently: true });
       const outImgData = outCtx.getImageData(0, 0, preprocessedCanvas.width, preprocessedCanvas.height);
       
-      const outputArray = Array.from(outImgData.data);
+      // Pass ArrayBuffer directly to avoid memory bottlenecks
+      const outputArray = outImgData.data.buffer; 
 
       event.source.postMessage({
         type: 'PREPROCESS_IMAGE_RESULT',

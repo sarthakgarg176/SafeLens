@@ -19,13 +19,11 @@ export async function getOCRWorker(lang = 'eng') {
         cacheMethod: 'none'
       });
 
-      // ULTIMATE CONFIG: Force layout generation
-      // TSV aur HOCR on karne se Tesseract.js hamesha `data.words` populate karta hai
+      // ✅ THE FIX: Removed 'tessedit_ocr_engine_mode'
       await worker.setParameters({
         tessedit_pageseg_mode: '3',   // Auto segmentation
         tessedit_create_hocr: '1',    // Force HTML layout metadata
-        tessedit_create_tsv: '1',     // Force Tabular layout (guarantees words array)
-        tessedit_ocr_engine_mode: '1' // Neural Net (best accuracy)
+        tessedit_create_tsv: '1'      // Force Tabular layout
       });
 
       cachedWorker = worker;
