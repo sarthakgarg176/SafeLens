@@ -39,6 +39,7 @@ export async function fileToCanvas(file) {
 
 async function runOffscreenPreprocess(canvas, options) {
   if (typeof document !== 'undefined' || !chrome.offscreen) return preprocessImage(canvas, options);
+  
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const bytes = new Uint8Array(imgData.data.buffer);
@@ -46,11 +47,14 @@ async function runOffscreenPreprocess(canvas, options) {
   const chunkSize = 8192;
   for (let i = 0; i < bytes.length; i += chunkSize) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
   const base64Data = btoa(binary);
+  
   const result = await executeOffscreenTask('PREPROCESS_IMAGE', { width: canvas.width, height: canvas.height, base64Data, options });
+  
   if (!result || !result.base64Data) throw new Error(`Offscreen preprocessing failed.`);
   const outBinaryString = atob(result.base64Data);
   const outBytes = new Uint8Array(outBinaryString.length);
   for (let i = 0; i < outBinaryString.length; i++) outBytes[i] = outBinaryString.charCodeAt(i);
+  
   const outCanvas = new OffscreenCanvas(result.width, result.height);
   const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
   outCtx.putImageData(new ImageData(new Uint8ClampedArray(outBytes.buffer), result.width, result.height), 0, 0);
@@ -62,12 +66,52 @@ export async function runScanPipeline(file, options = {}) {
   try {
     const canvas = await fileToCanvas(file);
     const preprocessedCanvas = await runOffscreenPreprocess(canvas, options.preprocess);
+    
     const ocrResult = await recognizeImage(preprocessedCanvas);
-    const mergedTextDetections = mergeOverlappingDetections(scanText(ocrResult.text, ocrResult.words));
-    const fusionReport = fuseConfidence(mergedTextDetections, await classifyText(ocrResult.text));
+    const wordBoxes = ocrResult.words || [];
+    console.log(`[ScanService] Pipeline running with ${wordBoxes.length} text boxes.`);
+
+    const rawRegexDetections = scanText(ocrResult.text, wordBoxes);
+    const mergedTextDetections = mergeOverlappingDetections(rawRegexDetections);
+
+    let qrDetections = [];
+    if ('BarcodeDetector' in globalThis) {
+      try {
+        const qrScanner = new BarcodeDetector({ formats: ['qr_code'] });
+        const barcodes = await qrScanner.detect(preprocessedCanvas);
+        
+        qrDetections = barcodes.map(qr => ({
+          type: 'QR_CODE',
+          severity: 'critical',
+          bboxes: [{
+            x: qr.boundingBox.x,
+            y: qr.boundingBox.y,
+            width: qr.boundingBox.width,
+            height: qr.boundingBox.height,
+            confidence: 100 
+          }]
+        }));
+        
+        if (qrDetections.length > 0) {
+          console.log(`[ScanService] Successfully detected ${qrDetections.length} QR Code(s).`);
+        }
+      } catch (err) {
+        console.warn('[ScanService] Native QR scanner failed or is unsupported:', err);
+      }
+    }
+
+    const combinedDetections = [...mergedTextDetections, ...qrDetections];
+    const fusionReport = fuseConfidence(combinedDetections, await classifyText(ocrResult.text));
+    
     const finalDetections = [...fusionReport.fusedDetections];
     const riskReport = analyzeRisk(finalDetections);
-    return { success: true, detections: finalDetections, riskLevel: riskReport.riskLevel, processingTime: Date.now() - startTime };
+    
+    return { 
+      success: true, 
+      detections: finalDetections, 
+      riskLevel: riskReport.riskLevel, 
+      processingTime: Date.now() - startTime 
+    };
   } catch (error) {
     console.error('[ScanService] Pipeline failed:', error);
     return { success: false, detections: [], error: error.message };

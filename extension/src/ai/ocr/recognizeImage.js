@@ -14,18 +14,12 @@ function arrayBufferToBase64(buffer) {
 
 export async function recognizeImage(canvas) {
   try {
-    // ==========================================
-    // PATH 1: SERVICE WORKER (Delegates to Offscreen via Dedicated Channel)
-    // ==========================================
     if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
       if (!canvas.width || !canvas.height) {
         throw new Error(`[RecognizeImage] Canvas dimensions are invalid (W:${canvas.width}, H:${canvas.height}) before OCR.`);
       }
 
-      // 🚀 THE FIX: Convert OffscreenCanvas to a PNG Blob, then to ArrayBuffer, then Base64
-      // This creates an actual PNG file instead of passing raw RGBA pixel data
       const blob = await canvas.convertToBlob({ type: 'image/png' });
-      
       if (!blob || blob.size === 0) {
         throw new Error(`[RecognizeImage] Canvas conversion to Blob failed (size: 0) before OCR.`);
       }
@@ -33,9 +27,8 @@ export async function recognizeImage(canvas) {
       const arrayBuffer = await blob.arrayBuffer();
       const base64Data = arrayBufferToBase64(arrayBuffer);
 
-      console.log(`[Pre-OCR Diagnostic] Sending image to OCR. Canvas W:${canvas.width}, H:${canvas.height}. Base64 sample: ${base64Data.substring(0, 50)}... Total Length: ${base64Data.length}`);
+      console.log(`[Pre-OCR Diagnostic] Sending image to OCR. Canvas W:${canvas.width}, H:${canvas.height}. Base64 sample: ${base64Data.substring(0, 50)}...`);
 
-      // 1. Send to Offscreen using the new port-based bridge
       const offscreenResult = await executeOffscreenTask('RECOGNIZE_IMAGE', {
         width: canvas.width, 
         height: canvas.height, 
@@ -45,50 +38,59 @@ export async function recognizeImage(canvas) {
       console.log(`[RecognizeImage] Received from Offscreen. Words count: ${offscreenResult?.words?.length || 0}`);
       
       if (!offscreenResult.text && (!offscreenResult.words || offscreenResult.words.length === 0)) {
-  console.warn('[RecognizeImage] OCR returned empty - using fallback full canvas bounding box');
-  return {
-    text: '',
-    words: [],
-    boundingBoxes: [{
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height,
-      confidence: 50
-    }],
-    confidence: 0
-  };
-}
+        console.warn('[RecognizeImage] OCR returned empty - using fallback full canvas bounding box');
+        return {
+          text: '',
+          words: [],
+          boundingBoxes: [{
+            x: 0, y: 0, width: canvas.width, height: canvas.height, confidence: 50
+          }],
+          confidence: 0
+        };
+      }
       return {
         text: offscreenResult.text || '',
         words: offscreenResult.words || [],
-        boundingBoxes: offscreenResult.words || [], // Mapping words as boxes
+        boundingBoxes: offscreenResult.boundingBoxes || offscreenResult.words || [],
         confidence: 0
       };
-    }
-    
-    // ==========================================
-    // PATH 2: OFFSCREEN DOCUMENT / CONTENT SCRIPT (Runs actual OCR)
-    // ==========================================
+    } 
     else {
       console.log('[RecognizeImage] Starting Tesseract OCR process...');
       const ocrResult = await runOCROnWorker(canvas);
       const data = ocrResult.data || ocrResult;
+
+      console.log('================ RAW TESSERACT DATA ================');
+      console.log('[DEBUG] Keys present in Tesseract data:', Object.keys(data));
+      console.log('[DEBUG] Natively has words array?', !!data.words, 'Count:', data.words ? data.words.length : 0);
+      console.log('====================================================');
       
       let words = data.words || [];
 
-      // Defensive Parsing (Deep Traversal for safety)
-      if (words.length === 0 && data.blocks) {
+      if (words.length === 0 && data.lines && data.lines.length > 0) {
+         console.log('[RecognizeImage] Native words empty. Extracting from lines...');
+         data.lines.forEach(line => { if (line.words) words.push(...line.words); });
+      }
+
+      if (words.length === 0 && data.blocks && data.blocks.length > 0) {
+         console.log('[RecognizeImage] Native words & lines empty. Extracting deeply from blocks...');
          data.blocks.forEach(block => {
-             block.paragraphs?.forEach(para => {
-                 para.lines?.forEach(line => {
-                     if (line.words) words.push(...line.words);
+             if (block.paragraphs) {
+                 block.paragraphs.forEach(para => {
+                     if (para.lines) {
+                         para.lines.forEach(line => {
+                             if (line.words) words.push(...line.words);
+                         });
+                     }
                  });
-             });
+             }
          });
       }
       
-      const boundingBoxes = extractBoundingBoxes({ ...data, words });
+      console.log(`[RecognizeImage] Final Extracted Words Count: ${words.length}`);
+      
+      data.words = words; 
+      const boundingBoxes = extractBoundingBoxes(data);
       
       return {
         text: data.text || '',

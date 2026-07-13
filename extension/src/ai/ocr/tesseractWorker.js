@@ -17,10 +17,11 @@ export async function getOCRWorker(lang = 'eng') {
         workerBlobURL: false,
         cacheMethod: 'none'
       });
+
       await worker.setParameters({
-        tessedit_pageseg_mode: '3',
-        tessedit_create_hocr: '1',
-        tessedit_create_tsv: '1'
+        tessedit_pageseg_mode: '3',   
+        tessedit_create_hocr: '1',    
+        tessedit_create_tsv: '1'      
       });
       cachedWorker = worker;
       return worker;

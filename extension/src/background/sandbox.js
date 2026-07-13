@@ -17,23 +17,35 @@ function applySmartInvert(ctx, width, height) {
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
   let totalBrightness = 0;
+
   for (let i = 0; i < data.length; i += 4) {
-    totalBrightness += (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    const brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    totalBrightness += brightness;
   }
-  if ((totalBrightness / (width * height)) < 100) {
+
+  const avgBrightness = totalBrightness / (width * height);
+  console.log(`[Sandbox] Image average brightness: ${avgBrightness.toFixed(2)}`);
+
+  if (avgBrightness < 100) {
+    console.log('[Sandbox] Dark mode detected. Inverting colors for OCR compatibility...');
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = 255 - data[i]; data[i + 1] = 255 - data[i + 1]; data[i + 2] = 255 - data[i + 2];
+      data[i] = 255 - data[i];         
+      data[i + 1] = 255 - data[i + 1]; 
+      data[i + 2] = 255 - data[i + 2]; 
     }
     ctx.putImageData(imgData, 0, 0);
   }
 }
 
+waitForOpenCV()
+  .then(() => console.log('[Sandbox] OpenCV.js is fully loaded and ready.'))
+  .catch((err) => console.error('[Sandbox] OpenCV.js initialization error:', err));
+
 window.addEventListener('message', async (event) => {
   if (event.data?.type === 'PREPROCESS_IMAGE') {
-    const { width, height, data, messageId } = event.data.payload;
+    const { width, height, data, options, messageId } = event.data.payload;
 
     try {
-      // Defensive Check: Ensure data is not empty before processing
       if (!data || data.byteLength === 0) throw new Error("Sandbox: Received empty input buffer");
 
       await waitForOpenCV();
@@ -45,16 +57,16 @@ window.addEventListener('message', async (event) => {
       
       applySmartInvert(ctx, width, height);
 
-      const preprocessedCanvas = await preprocessImage(canvas, {});
+      console.log('[Sandbox] Executing preprocessImage()...');
+      const preprocessedCanvas = await preprocessImage(canvas, options || {});
       
-      // Safety Check: Verify result validity
       if (preprocessedCanvas.width === 0 || preprocessedCanvas.height === 0) {
         throw new Error("Sandbox: Preprocessing failed, returned zero-size canvas");
       }
 
       const outCtx = preprocessedCanvas.getContext('2d', { willReadFrequently: true });
       const outImgData = outCtx.getImageData(0, 0, preprocessedCanvas.width, preprocessedCanvas.height);
-      const outputBuffer = outImgData.data.buffer.slice(0); // Clone for transfer
+      const outputBuffer = outImgData.data.buffer.slice(0);
 
       event.source.postMessage({
         type: 'PREPROCESS_IMAGE_RESULT',
@@ -65,7 +77,7 @@ window.addEventListener('message', async (event) => {
           height: preprocessedCanvas.height,
           data: outputBuffer
         }
-      }, event.origin === 'null' ? '*' : event.origin, [outputBuffer]); // Transfer ownership
+      }, event.origin === 'null' ? '*' : event.origin, [outputBuffer]); 
       
     } catch (error) {
       console.error('[Sandbox] Preprocessing error:', error);
