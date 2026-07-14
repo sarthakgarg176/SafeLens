@@ -1,6 +1,6 @@
 /**
- * Confidence Fusion Engine (Updated)
- * Logic: Safer redaction - if detection type is high risk, we keep it even if checksum fails.
+ * Confidence Fusion Engine
+ * Logic: Merges Regex detections and Semantic AI predictions for a robust risk score.
  */
 
 const SEVERITY_LEVELS = {
@@ -20,39 +20,45 @@ const SEVERITY_LEVELS = {
   PASSWORD_PATTERNS: 'critical'
 };
 
-export function fuseConfidences(detections) {
-  if (!Array.isArray(detections)) {
-    return [];
-  }
-
-  return detections.map((det) => {
-    let isDropped = false;
+export function fuseConfidence(regexDetections, semanticResult) {
+  const WEIGHT_REGEX = 0.6;
+  const WEIGHT_SEMANTIC = 0.4;
+  
+  // 1. Process Detections
+  const fusedDetections = regexDetections.map((det) => {
     let ocrConf = typeof det.ocrConfidence === 'number' ? det.ocrConfidence : 0.5;
     let regexConf = typeof det.regexConfidence === 'number' ? det.regexConfidence : 0.8;
 
-    // FIX: Instead of dropping, we penalize confidence if rule fails
     if (det.rulePassed === false) {
-      console.warn(`[ConfidenceFusion] Rule validation failed for [${det.type}]. Keeping detection for safety.`);
-      // Penalty: drastically reduce confidence but do NOT drop the detection
+      console.warn(`[ConfidenceFusion] Rule validation failed for [${det.type}]. Keeping for safety.`);
       ocrConf *= 0.1; 
       regexConf *= 0.1;
     }
 
-    // Bayes-like weighted fusion
     let fused = 0.7 * regexConf + 0.3 * ocrConf;
     fused = Math.min(1.0, Math.max(0.0, fused));
 
     return {
-      type: det.type,
-      value: det.value,
-      ocrConfidence: ocrConf,
-      regexConfidence: regexConf,
+      ...det,
       fusedConfidence: parseFloat(fused.toFixed(4)),
-      severity: SEVERITY_LEVELS[det.type] || 'medium',
-      startIndex: det.startIndex,
-      endIndex: det.endIndex,
-      bboxes: det.bboxes || [],
-      source: det.source || 'regex'
+      severity: SEVERITY_LEVELS[det.type] || 'medium'
     };
   });
+
+  // 2. Semantic Score Integration
+  const sensitiveLabels = ['Government ID', 'Financial Statement', 'Medical Record', 'Passport', 'Aadhaar Card', 'PAN Card'];
+  const isSensitiveTopic = sensitiveLabels.includes(semanticResult.topic);
+  
+  // Higher weight if semantic model is confident
+  const finalSemanticScore = isSensitiveTopic ? semanticResult.confidence : 0.0;
+
+  return {
+    fusedDetections,
+    semanticContext: {
+      topic: semanticResult.topic,
+      confidence: semanticResult.confidence,
+      isSensitive: isSensitiveTopic
+    },
+    finalGlobalScore: (fusedDetections.length > 0 ? 0.9 : 0.1) * WEIGHT_REGEX + (finalSemanticScore * WEIGHT_SEMANTIC)
+  };
 }

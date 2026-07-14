@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>SafeLens Offscreen Processor</title>
-    <script type="module" crossorigin src="/assets/offscreen-hoTTDWFS.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  </head>
-  <body>
-    <!-- Iframe for OpenCV Sandbox -->
-    <iframe id="sandbox-iframe" src="/public/sandbox.html" style="display:none;"></iframe>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <title>SafeLens Offscreen Document</title>
+  <script type="module" crossorigin src="/assets/offscreen-BJsvuHvV.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="modulepreload" crossorigin href="/assets/_commonjsHelpers-IkB594pC.js">
+</head>
+<body>
+  <!-- 🚀 Is iframe ka id 'sandboxFrame' hona must hai, aur src sahi hona chahiye -->
+  <iframe id="sandboxFrame" src="sandbox.html"></iframe>
+  
+  <!-- Offscreen script ko body ke end mein load karte hain taaki DOM structure ready ho chuka ho -->
+</body>
 </html>

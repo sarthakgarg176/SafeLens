@@ -3,7 +3,7 @@ import { toGrayscale } from './grayscale.js';
 import { denoiseImage } from './denoise.js';
 import { deskewCanvas } from './deskew.js';
 import { applyThreshold } from './threshold.js';
-import { sendToOffscreen } from '../../background/offscreenManager.js';
+import { executeOffscreenTask } from '../../background/offscreenManager.js';
 
 export async function preprocessImage(imageSource, options = {}) {
   // Offscreen handling (Service Worker)

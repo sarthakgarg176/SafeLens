@@ -7,7 +7,6 @@ let workerLock = Promise.resolve();
 export async function getOCRWorker(lang = 'eng') {
   if (cachedWorker) return cachedWorker;
   if (initPromise) return initPromise;
-
   initPromise = (async () => {
     try {
       console.log(`[TesseractWorker] Spawning local OCR worker...`);
@@ -18,14 +17,11 @@ export async function getOCRWorker(lang = 'eng') {
         workerBlobURL: false,
         cacheMethod: 'none'
       });
-
-      // ✅ THE FIX: Removed 'tessedit_ocr_engine_mode'
       await worker.setParameters({
-        tessedit_pageseg_mode: '3',   // Auto segmentation
-        tessedit_create_hocr: '1',    // Force HTML layout metadata
-        tessedit_create_tsv: '1'      // Force Tabular layout
+        tessedit_pageseg_mode: '3',
+        tessedit_create_hocr: '1',
+        tessedit_create_tsv: '1'
       });
-
       cachedWorker = worker;
       return worker;
     } catch (error) {
@@ -42,15 +38,9 @@ export async function runOCROnWorker(canvas) {
   const nextLock = new Promise((resolve) => { workerLock.then(() => resolve()); });
   workerLock = new Promise((resolve) => { release = resolve; });
   await nextLock;
-
   try {
     const worker = await getOCRWorker();
-    
-    // Explicitly pass options during recognition as a fallback
-    const result = await worker.recognize(canvas, {
-       tessjs_create_hocr: '1',
-       tessjs_create_tsv: '1'
-    });
+    const result = await worker.recognize(canvas, { tessjs_create_hocr: '1', tessjs_create_tsv: '1' });
     return result;
   } finally {
     release();

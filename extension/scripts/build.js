@@ -23,17 +23,17 @@ async function runBuild() {
 
   try {
     // 2. Build Popup React App
-    // We treat popup.html as a standard web entry point. It is built in ES module format.
     console.log('\n--- Building Popup React App ---');
     await build({
+      configFile: false, // 🚀 FIX: Prevent vite.config.js interference
       root: extDir,
       plugins: [react()],
-      publicDir: false, // Handle copying of static files manually
+      publicDir: false,
       build: {
         outDir: distDir,
         emptyOutDir: false,
         minify: 'esbuild',
-        sourcemap: false, // Disable sourcemaps to comply with Extension store policies
+        sourcemap: false,
         rollupOptions: {
           input: {
             popup: resolve(publicDir, 'popup.html'),
@@ -50,14 +50,9 @@ async function runBuild() {
     });
 
     // 3. Build Background Service Worker
-    // Built in ES module format. inlineDynamicImports collapses all dynamic import() calls
-    // into static inline code, producing a single self-contained file.
-    // This is REQUIRED because:
-    //   a) Chrome MV3 module service workers do not support dynamic import().
-    //   b) Code-splitting generates a separate chunk + an await import() call in the entry,
-    //      both of which cause "Status code: 3" registration failure.
     console.log('\n--- Building Background Service Worker ---');
     await build({
+      configFile: false, // 🚀 FIX: Prevent vite.config.js interference
       root: extDir,
       publicDir: false,
       build: {
@@ -72,22 +67,19 @@ async function runBuild() {
           fileName: () => 'background/serviceWorker.js',
         },
         rollupOptions: {
-          external: [], // Bundle all dependencies into the single output file
+          external: [], 
           output: {
             entryFileNames: 'background/serviceWorker.js',
-            // inlineDynamicImports: prevents Rollup from code-splitting the SW into
-            // a chunk file that would require a dynamic import() at runtime.
-            inlineDynamicImports: true,
+            inlineDynamicImports: false,
           },
         },
       },
     });
 
     // 4. Build Content Script
-    // Must be built as a self-contained IIFE. This is critical for Chrome injection compatibility
-    // to prevent code-splitting from creating import statements.
     console.log('\n--- Building Content Script ---');
     await build({
+      configFile: false, // 🚀 FIX: Prevent vite.config.js interference
       root: extDir,
       publicDir: false,
       build: {
@@ -102,10 +94,11 @@ async function runBuild() {
           fileName: () => 'content/contentScript.js',
         },
         rollupOptions: {
-          external: [], // Force rollup to bundle all dependencies inside the IIFE wrapper
+          external: [], 
           output: {
             entryFileNames: 'content/contentScript.js',
             extend: true,
+            inlineDynamicImports: true, // 🚀 FIX: Moved here to properly force IIFE bundling
           },
         },
       },
