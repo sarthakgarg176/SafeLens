@@ -631,63 +631,6 @@ SafeLens uses the following permissions:
 | Upload Normal Landscape Image | No Redaction |
 
 
-
-## 🏠 Security Dashboard
-
-<p align="center">
-<img src="docs/dashboard.png" width="90%">
-</p>
-
-**Features shown**
-
-- Live Incident Feed
-- Risk Analytics
-- Protected Uploads
-- Recent Activity
-- Security Metrics
-
----
-
-## 🌐 Upload Interception
-
-<p align="center">
-<img src="docs/interceptor.png" width="80%">
-</p>
-
-The browser extension automatically intercepts every supported upload event before the file leaves the browser.
-
----
-
-## 🔍 OCR Detection
-
-<p align="center">
-<img src="docs/ocr.png" width="80%">
-</p>
-
-OCR extracts visible text from uploaded images before privacy analysis begins.
-
----
-
-## 🛡 Automatic Redaction
-
-<p align="center">
-<img src="docs/redaction.png" width="80%">
-</p>
-
-Sensitive information is automatically hidden before upload.
-
----
-
-## 🚨 Incident Dashboard
-
-<p align="center">
-<img src="docs/incidents.png" width="90%">
-</p>
-
-Security administrators receive live incident updates without refreshing the dashboard.
-
----
-
 # 🎥 Demo Video
 
 A complete demonstration video is available showing:
