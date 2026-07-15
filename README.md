@@ -1255,52 +1255,6 @@ This privacy-first approach makes SafeLens suitable for enterprise environments 
 
 ---
 
----
-
-# 📸 Screenshots
-
-> Replace the placeholder images below with actual screenshots from your project.
-
-## 🏠 Dashboard
-
-<p align="center">
-<img src="docs/images/dashboard.png" width="95%">
-</p>
-
----
-
-## 🛡 Upload Interception
-
-<p align="center">
-<img src="docs/images/interceptor.png" width="80%">
-</p>
-
----
-
-## 🔍 OCR Detection
-
-<p align="center">
-<img src="docs/images/ocr.png" width="80%">
-</p>
-
----
-
-## ✂ Automatic Redaction
-
-<p align="center">
-<img src="docs/images/redaction.png" width="80%">
-</p>
-
----
-
-## 🚨 Incident Monitoring
-
-<p align="center">
-<img src="docs/images/incidents.png" width="95%">
-</p>
-
----
-
 # 🎥 Demo Video
 
 A short demonstration video (2–3 minutes) showcases:
