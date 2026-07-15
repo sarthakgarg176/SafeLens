@@ -1374,20 +1374,16 @@ Special thanks to the open-source community for the amazing libraries and tools 
 
 | Name | Role |
 |------|------|
-| Aarti Yadav | Backend Development & Dashboard Integration |
-| Sarthak Garg | Chrome Extension & OCR Pipeline |
-| Team Member | AI / Testing |
-| Team Member | UI/UX & Documentation |
+| Aarti Yadav | Backend Development  |
+| Sarthak Garg | Dashboard and Integration |
+| Sahil  | AI pipeline and extension |
 
-> Update the table if your final team composition is different.
-
----
 
 # 📬 Contact
 
-For questions, suggestions, or collaboration:
+For questions OR suggestions:
 
-📧 Email: your-email@example.com
+📧 Email: yadavaarti2211@gmail.com
 
 🐙 GitHub: https://github.com/sarthakgarg176/SafeLens
 
