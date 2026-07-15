@@ -15,6 +15,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import apiClient from '../services/apiClient.js';
 
 /* ─── Default seed data ─────────────────────────────────────────────────────── */
 
@@ -156,17 +157,126 @@ function computeActiveVectorCount(incidents) {
 
 export function SecurityProvider({ children }) {
   /* ── Core shared state ─────────────────────────────────────────────────── */
-  const [incidents, setIncidents] = useState(() =>
-    load('ps_incidents', DEFAULT_INCIDENTS)
-  );
+  const [incidents, setIncidents] = useState(() => load('ps_incidents', DEFAULT_INCIDENTS));
+  const [takedowns, setTakedowns] = useState(() => load('ps_takedowns', DEFAULT_TAKEDOWNS));
+  const [webhooks, setWebhooks] = useState(() => load('ps_webhooks', DEFAULT_WEBHOOKS));
 
-  const [takedowns, setTakedowns] = useState(() =>
-    load('ps_takedowns', DEFAULT_TAKEDOWNS)
-  );
+  /* ── Telemetry Polling & Sync (Phase 3) ────────────────────────────────── */
+  useEffect(() => {
+    let mounted = true;
+    let intervalId = null;
 
-  const [webhooks, setWebhooks] = useState(() =>
-    load('ps_webhooks', DEFAULT_WEBHOOKS)
-  );
+    const fetchRealData = async () => {
+      // Pause polling if the dashboard tab is not currently visible/active
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      try {
+        // Fetch incidents
+        const incidentsResponse = await apiClient.getIncidents();
+        if (mounted && incidentsResponse?.success && Array.isArray(incidentsResponse.data)) {
+          // Map backend schema to dashboard schema
+          const mappedIncidents = incidentsResponse.data.map((backInc) => {
+            let severity = 'medium';
+            if (backInc.severity) {
+              const sevLower = backInc.severity.toLowerCase();
+              if (sevLower === 'serious' || sevLower === 'critical' || sevLower === 'high') {
+                severity = 'high';
+              } else if (sevLower === 'normal' || sevLower === 'medium') {
+                severity = 'medium';
+              } else {
+                severity = 'low';
+              }
+            }
+
+            let status = 'Investigating';
+            if (backInc.status) {
+              const statLower = backInc.status.toLowerCase();
+              if (statLower === 'mitigated' || statLower === 'completed') {
+                status = 'Mitigated';
+              } else if (statLower === 'escalated' || statLower === 'escalated to legal') {
+                status = 'Escalated';
+              }
+            }
+
+            let date = 'Just now';
+            if (backInc.timestamp) {
+              try {
+                const d = new Date(backInc.timestamp);
+                date = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) + ', ' + d.getFullYear();
+              } catch (e) {
+                date = backInc.timestamp;
+              }
+            }
+
+            return {
+              id: backInc.incident_id ? `INC-${backInc.incident_id}` : `INC-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+              vector: backInc.filename || 'Unknown Document',
+              url: backInc.website || 'unknown',
+              date: date,
+              severity: severity,
+              status: status
+            };
+          });
+
+          setIncidents((prev) => {
+            // State comparison to avoid redundant re-renders
+            if (JSON.stringify(prev) === JSON.stringify(mappedIncidents)) {
+              return prev;
+            }
+            return mappedIncidents;
+          });
+        }
+        
+        // Fetch takedowns (if the API supports it)
+        const takedownsResponse = await apiClient.getTakedowns();
+        if (mounted && takedownsResponse?.success && Array.isArray(takedownsResponse.data)) {
+          setTakedowns((prev) => {
+            // State comparison to avoid redundant re-renders
+            if (JSON.stringify(prev) === JSON.stringify(takedownsResponse.data)) {
+              return prev;
+            }
+            return takedownsResponse.data;
+          });
+        }
+      } catch (error) {
+        console.warn('[SecurityContext] Telemetry fetch failed:', error);
+      }
+    };
+
+    // Initial load
+    fetchRealData();
+
+    // 15-second short-polling interval
+    intervalId = setInterval(fetchRealData, 15000);
+
+    // Pause/Resume polling based on tab visibility state
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchRealData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const handleScanCompletedMessage = (event) => {
+      if (event.data && event.data.type === 'SAFELENS_SCAN_COMPLETED') {
+        console.log('[SecurityContext] Instant scan sync signal received. Refreshing telemetry data...');
+        fetchRealData();
+        setTimeout(fetchRealData, 1500);
+        setTimeout(fetchRealData, 3000);
+      }
+    };
+    window.addEventListener('message', handleScanCompletedMessage);
+
+    return () => {
+      mounted = false;
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('message', handleScanCompletedMessage);
+    };
+  }, []);
 
   /* ── localStorage sync (write-through on every change) ─────────────────── */
   useEffect(() => { save('ps_incidents', incidents); }, [incidents]);
@@ -179,17 +289,45 @@ export function SecurityProvider({ children }) {
     [incidents]
   );
 
-  /* ── Action: update a specific incident's status ────────────────────────── */
-  const updateIncidentStatus = useCallback((id, newStatus) => {
-    setIncidents((prev) =>
-      prev.map((inc) => (inc.id === id ? { ...inc, status: newStatus } : inc))
-    );
+  /* ── Toast Notifications System ─────────────────────────────────────────── */
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
   }, []);
 
+  /* ── Action: update a specific incident's status ────────────────────────── */
+  const updateIncidentStatus = useCallback(async (id, newStatus) => {
+    let previousIncidents = [];
+    setIncidents((prev) => {
+      previousIncidents = prev; // Capture current state for rollback
+      return prev.map((inc) => (inc.id === id ? { ...inc, status: newStatus } : inc));
+    });
+
+    try {
+      showToast(`Updating incident status...`, 'success');
+      await apiClient.patchIncidentStatus(id, newStatus);
+      
+      // Trigger background sync to align state with backend
+      const incidentsResponse = await apiClient.getIncidents();
+      if (incidentsResponse?.success && Array.isArray(incidentsResponse.data)) {
+        setIncidents(incidentsResponse.data);
+      }
+      showToast(`Incident status updated to ${newStatus}`, 'success');
+    } catch (error) {
+      console.error('[SecurityContext] Update incident status failed, rolling back:', error);
+      setIncidents(previousIncidents); // Revert state on failure
+      showToast(`Failed to update incident: ${error.message}`, 'error');
+    }
+  }, [showToast]);
+
   /* ── Action: route a takedown target to the legal queue ─────────────────── */
-  const triggerLegalTakedown = useCallback((id) => {
-    setTakedowns((prev) =>
-      prev.map((td) =>
+  const triggerLegalTakedown = useCallback(async (id) => {
+    let previousTakedowns = [];
+    setTakedowns((prev) => {
+      previousTakedowns = prev; // Capture current state for rollback
+      return prev.map((td) =>
         td.id === id
           ? {
               ...td,
@@ -198,9 +336,25 @@ export function SecurityProvider({ children }) {
               lastUpdate: 'Just now',
             }
           : td
-      )
-    );
-  }, []);
+      );
+    });
+
+    try {
+      showToast('Escalating takedown target to legal queue...', 'success');
+      await apiClient.escalateTakedown(id);
+
+      // Trigger background sync to align state with backend
+      const takedownsResponse = await apiClient.getTakedowns();
+      if (takedownsResponse?.success && Array.isArray(takedownsResponse.data)) {
+        setTakedowns(takedownsResponse.data);
+      }
+      showToast('Takedown successfully escalated to legal', 'success');
+    } catch (error) {
+      console.error('[SecurityContext] Escalate takedown failed, rolling back:', error);
+      setTakedowns(previousTakedowns); // Revert state on failure
+      showToast(`Failed to escalate takedown: ${error.message}`, 'error');
+    }
+  }, [showToast]);
 
   /* ── Action: toggle a webhook active / paused ───────────────────────────── */
   const toggleWebhookStatus = useCallback((id) => {
@@ -255,6 +409,16 @@ export function SecurityProvider({ children }) {
   return (
     <SecurityContext.Provider value={value}>
       {children}
+      {toast && (
+        <div className={`fixed bottom-5 right-5 z-50 px-4.5 py-3 rounded-2xl border shadow-2xl flex items-center gap-3 backdrop-blur-md transition-all duration-300 animate-slide-in ${
+          toast.type === 'success' 
+            ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-400' 
+            : 'bg-rose-950/80 border-rose-500/30 text-rose-400'
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${toast.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400 animate-pulse'}`}></div>
+          <span className="text-xs font-semibold font-mono tracking-wide">{toast.message}</span>
+        </div>
+      )}
     </SecurityContext.Provider>
   );
 }

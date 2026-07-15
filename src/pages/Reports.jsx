@@ -7,6 +7,7 @@ import {
   CheckCheck
 } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
+import { useSecurity } from '../context/SecurityContext';
 
 const scorecards = [
   {
@@ -71,8 +72,29 @@ const mockAudits = [
 ];
 
 export default function Reports() {
+  const { incidents } = useSecurity();
   const [exportingId, setExportingId] = useState(null);
   const [exportedId, setExportedId] = useState(null);
+
+  // Generate dynamic audits from incidents
+  const dynamicAudits = incidents.map(inc => {
+    let framework = 'Internal Security';
+    if (inc.severity === 'high') framework = 'GDPR';
+    else if (inc.severity === 'medium') framework = 'HIPAA';
+    
+    let score = 100;
+    if (inc.severity === 'high') score = 42;
+    else if (inc.severity === 'medium') score = 84;
+
+    return {
+      id: `REP-${inc.id.replace('INC-', '')}`,
+      name: (inc.vector.replace(/\.[^/.]+$/, '') || 'document') + '_audit_log.pdf',
+      framework: framework,
+      generated: inc.date,
+      score: score,
+      status: score >= 90 ? 'Pass' : 'Warning'
+    };
+  });
 
   const triggerExport = (reportId) => {
     if (exportingId !== null) return;
@@ -187,7 +209,7 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 text-slate-700 dark:text-slate-300 font-medium">
-              {mockAudits.map((report) => (
+              {dynamicAudits.map((report) => (
                 <tr
                   key={report.id}
                   className="hover:bg-slate-100/40 dark:hover:bg-white/[0.02] transition-colors duration-150"

@@ -12,6 +12,7 @@
   ],
   "host_permissions": [
     "https://www.remove.bg/*",
+    "https://www.ilovepdf.com/*",
     "https://safelens-zttx.onrender.com/*"
   ],
   "background": {
@@ -23,6 +24,14 @@
       "matches": ["<all_urls>"],
       "js": ["content/contentScript.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*"
+      ],
+      "js": ["content/dashboardBridge.js"],
+      "run_at": "document_idle"
     }
   ],
   "action": {

@@ -37,6 +37,17 @@ const handlers = {
     return { ok: true };
   },
 
+  AUTH_HANDSHAKE: async (payload) => {
+    // Handle both payload formats safely
+    const token = payload?.token || payload;
+    if (!token) {
+      throw new Error('Invalid payload: token is required for AUTH_HANDSHAKE');
+    }
+    await chrome.storage.local.set({ sessionToken: token });
+    console.log('[MessageRouter] AUTH_HANDSHAKE successful. Token stored in local storage:', token);
+    return { success: true };
+  },
+
   PREPROCESS_IMAGE: async (payload) => {
     if (!payload || !payload.arrayBuffer) {
       throw new Error('Invalid payload: arrayBuffer is required');
@@ -208,37 +219,40 @@ const handlers = {
       await chrome.storage.local.set({ scans: updatedScans });
 
       try {
+        const matchedUrl = sender ? (sender.url || sender.origin || 'unknown') : 'unknown';
         await bridgeClient.syncScanResult({
           metadata: { name: payload.fileName, size: payload.size, type: 'image/png' },
+          matchedUrl: matchedUrl,
           ...payload
         });
 
-        if (payload.riskLevel !== 'low' && payload.assetId) {
-          const matchedUrl = sender ? (sender.url || sender.origin || 'unknown') : 'unknown';
-          const incidentResponse = await bridgeClient.sendIncidentNotification({
-            assetId: payload.assetId,
-            matchedUrl: matchedUrl,
-            matchConfidence: payload.confidence,
-            severity: payload.riskLevel === 'critical' ? 'Serious' : 'Normal',
-            status: 'Open'
+        if (payload.riskLevel !== 'low') {
+          const generatedIncidentId = `mock_inc_${Date.now()}`;
+          payload.incidentId = generatedIncidentId;
+          const currentStorage = await chrome.storage.local.get('scans');
+          const currentScans = currentStorage && currentStorage.scans ? currentStorage.scans : [];
+          const finalScans = currentScans.map(s => {
+            if (s.scanId === payload.scanId) {
+              return { ...s, incidentId: generatedIncidentId };
+            }
+            return s;
           });
-
-          if (incidentResponse && incidentResponse.success && incidentResponse.incidentId) {
-            payload.incidentId = incidentResponse.incidentId;
-            const currentStorage = await chrome.storage.local.get('scans');
-            const currentScans = currentStorage && currentStorage.scans ? currentStorage.scans : [];
-            const finalScans = currentScans.map(s => {
-              if (s.scanId === payload.scanId) {
-                return { ...s, incidentId: incidentResponse.incidentId };
-              }
-              return s;
-            });
-            await chrome.storage.local.set({ scans: finalScans });
-            console.log('[MessageRouter] Linked local scan record with backend incident ID:', incidentResponse.incidentId);
-          }
+          await chrome.storage.local.set({ scans: finalScans });
+          console.log('[MessageRouter] Linked local scan record with mock backend incident ID:', generatedIncidentId);
         }
       } catch (e) {
         console.warn('[MessageRouter] Failed to sync scan metadata with BridgeClient:', e);
+      }
+
+      // Broadcast scan completion to all tabs (for dashboard real-time updates)
+      try {
+        chrome.tabs.query({}, (tabs) => {
+          for (const tab of tabs) {
+            chrome.tabs.sendMessage(tab.id, { type: 'SAFELENS_BROADCAST_SCAN_COMPLETED' }).catch(() => {});
+          }
+        });
+      } catch (e) {
+        console.warn('[MessageRouter] Failed to broadcast scan completion:', e);
       }
     } finally {
       release();
@@ -280,7 +294,7 @@ export async function routeMessage(message, sender) {
       return { success: false, error: 'Malformed message: Missing type property' };
     }
 
-    console.log(`[MessageRouter] Routing message type: ${type}`, { senderId: sender.id, origin: sender.origin });
+    console.log(`[MessageRouter] Routing message type: ${type}`, { senderId: sender?.id, origin: sender?.origin });
 
     const handler = handlers[type];
     if (!handler) {
@@ -288,7 +302,7 @@ export async function routeMessage(message, sender) {
       return { success: false, error: `Unknown message type: '${type}'` };
     }
 
-    const result = await handler(payload, sender);
+    const result = await handler(payload || message, sender);
     return { success: true, data: result };
 
   } catch (error) {

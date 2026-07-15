@@ -104,6 +104,17 @@ async function runBuild() {
       },
     });
 
+    // 4.5 Copy Dashboard Bridge content script
+    console.log('\n--- Copying Dashboard Bridge Content Script ---');
+    const bridgeSrc = resolve(extDir, 'src/content/dashboardBridge.js');
+    const bridgeDest = resolve(distDir, 'content/dashboardBridge.js');
+    if (fs.existsSync(bridgeSrc)) {
+      fs.copyFileSync(bridgeSrc, bridgeDest);
+      console.log('Successfully copied dashboardBridge.js to dist/content/');
+    } else {
+      console.warn('dashboardBridge.js not found in src/content/');
+    }
+
     // 5. Copy manifest.json & icons/
     console.log('\n--- Copying Manifest and Asset Icons ---');
     const manifestSrc = resolve(publicDir, 'manifest.json');

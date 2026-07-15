@@ -1,3 +1,4 @@
+// extension/src/services/scanService.js
 import { preprocessImage } from '../ai/preprocessing/preprocessImage.js';
 import { recognizeImage } from '../ai/ocr/recognizeImage.js';
 import { scanText } from '../ai/detection/regexDetector.js';

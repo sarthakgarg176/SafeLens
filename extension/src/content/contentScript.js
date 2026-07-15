@@ -1,6 +1,46 @@
+// extension/src/content/contentScript.js
 (function(){
   "use strict";
   const E = new Set(["image/png","image/jpeg","image/jpg","image/webp","image/gif"]);
+
+  console.log("[SafeLens Master] Content Script successfully injected into target document context.");
+
+  /* ── Master Token Interception Bridge (Embedded Phase 2 Fix) ────────────── */
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+
+    const data = event.data || {};
+    if (data && data.type === 'SAFELENS_AUTH_INIT' && data.token) {
+      console.log('[SafeLens Master Bridge] Token intercepted directly in ContentScript:', data.token);
+      
+      try {
+        if (chrome.runtime && chrome.runtime.id) {
+          // Wrap token inside payload object to match exact messageRouter signatures
+          chrome.runtime.sendMessage({ 
+            type: 'AUTH_HANDSHAKE', 
+            payload: { token: data.token } 
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('[SafeLens Master Bridge] Background connection handshake dropped:', chrome.runtime.lastError.message);
+            } else {
+              console.log('[SafeLens Master Bridge] Explicit ACK from background router received:', response);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('[SafeLens Master Bridge] Runtime messaging environment error:', err);
+      }
+    }
+  });
+
+  // Relay broadcast messages from background script to the window
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message && message.type === 'SAFELENS_BROADCAST_SCAN_COMPLETED') {
+        window.postMessage({ type: 'SAFELENS_SCAN_COMPLETED' }, '*');
+      }
+    });
+  }
 
   function arrayBufferToBase64(buffer) {
     if (!buffer) return '';
@@ -151,10 +191,12 @@
           chrome.runtime.sendMessage({type:"REGISTER_BACKEND_ASSET",payload:{base64Data:base64Protected,name:e.protectedFile.name,type:e.protectedFile.type,blur_enabled:o.blurMode==="blur"&&e.protectionSummary.redacted?"true":"false",ai_cloak:o.aiCloakEnabled&&e.protectionSummary.redacted?"true":"false",watermark:o.watermarkEnabled&&e.protectionSummary.redacted?"true":"false"}},l=>{chrome.runtime.lastError?c({success:!1,error:chrome.runtime.lastError.message}):c(l||{success:!1})})
         });
         t&&t.success&&t.data&&(r=t.data.assetId,console.log("[UploadInterceptor] Safely registered asset via Background Worker. ID:",r))
-      }catch(i){console.warn("[UploadInterceptor] Background asset registration messaging failed:",i.message)}
+      }catch(i){console.warn("[UploadInterceptor] Background asset registration messaging failed:", i.message)}
+      
       try{
         const i=e.detections.reduce((n,t)=>Math.max(n,t.fusedConfidence||0),0)||.8;
-        await chrome.runtime.sendMessage({type:"LOG_SCAN",payload:{scanId:`scan_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,fileName:e.originalFile.name,size:e.originalFile.size,riskLevel:e.risk,confidence:parseFloat(i.toFixed(2)),piiCount:e.detections.length,processingTime:e.protectionSummary.processingTime,status:e.protectionSummary.redacted?"protected":"passed",detections:e.detections,assetId:r}})
+        await chrome.runtime.sendMessage({type:"LOG_SCAN",payload:{scanId:`scan_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,fileName:e.originalFile.name,size:e.originalFile.size,riskLevel:e.risk,confidence:parseFloat(i.toFixed(2)),piiCount:e.detections.length,processingTime:e.protectionSummary.processingTime,status:e.protectionSummary.redacted?"protected":"passed",detections:e.detections,assetId:r}});
+        window.postMessage({ type: 'SAFELENS_SCAN_COMPLETED' }, '*');
       }catch(i){console.warn("[UploadInterceptor] Failed to dispatch scan log metrics:",i)}
     })),s}
 
@@ -191,14 +233,13 @@
   function x(a){
     if(!a||typeof a.querySelectorAll!="function")return;
     a.querySelectorAll('input[type="file"]').forEach(r=>{d(r,"change",u.change)});
-    a.querySelectorAll('[class*="drop"], [class*="upload"], [id*="drop"], [id*="upload"], [role="button"]').forEach(r=>{d(r,"dragover",w),d(r,"drop",u.drop)});
+    a.querySelectorAll('[class*="drop"], [class*="upload"], [id*="drop"], [id*="upload"], [role="button"], #pickfiles, .uploader, .tool__workarea, [class*="file"], [id*="file"]').forEach(r=>{d(r,"dragover",w),d(r,"drop",u.drop)});
     a.querySelectorAll('textarea, [contenteditable="true"]').forEach(r=>{d(r,"paste",u.paste)})
   }
 
   function U(){
-    console.log("[DOMObserver] Initializing DOM Observer..."),x(document),document.body&&(y=new MutationObserver(a=>{for(const o of a)o.type==="childList"&&o.addedNodes.forEach(s=>{s.nodeType===Node.ELEMENT_NODE&&x(s)})}),y.observe(document.body,{childList:!0,subtree:!0})),d(document,"change",u.change),d(document,"dragover",w),d(document,"drop",u.drop),d(document,"paste",u.paste)
+    x(document),document.body&&(y=new MutationObserver(a=>{for(const o of a)o.type==="childList"&&o.addedNodes.forEach(s=>{s.nodeType===Node.ELEMENT_NODE&&x(s)})}),y.observe(document.body,{childList:!0,subtree:!0})),d(document,"change",u.change),d(document,"dragover",w),d(document,"drop",u.drop),d(document,"paste",u.paste)
   }
 
-  console.log("[SafeLens] Content Script successfully injected.");
   try{U()}catch(a){console.error("[SafeLens] Failed to initialize content observers:",a)}
 })();

@@ -16,7 +16,7 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-// 🛡️ THE ULTIMATE FAILSAFE MASKING
+// 🛡️ THE ULTIMATE FAILSAFE MASKING (Aspect-Ratio Aware)
 async function applyUniversalPrivacyMask(buffer, fileType, fileName, detections = []) {
   const nameLower = fileName.toLowerCase();
   
@@ -41,7 +41,6 @@ async function applyUniversalPrivacyMask(buffer, fileType, fileName, detections 
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-
       ctx.fillStyle = '#000000';
 
       // 1. DYNAMIC OCR MASKING
@@ -54,23 +53,21 @@ async function applyUniversalPrivacyMask(buffer, fileType, fileName, detections 
         });
       }
 
-      // 2. 🚀 ZABARDASTI FALLBACK (Agar background OCR fail ho jaye)
+      // 2. FALLBACK (Aspect-Ratio Aware)
       if (isTargetDocument && (!detections || detections.length === 0)) {
-        console.log('[SafeLens Shield] Fallback layout protection triggered!');
+        console.log('[SafeLens Shield] Fallback protection triggered!');
+        const isPortrait = img.height > img.width;
+        const scale = isPortrait ? img.width / 1000 : img.height / 1000;
+        
         if (nameLower.includes('front')) {
-          ctx.fillRect(img.width * 0.30, img.height * 0.45, img.width * 0.62, img.height * 0.20);
-          ctx.fillRect(img.width * 0.38, img.height * 0.65, img.width * 0.25, img.height * 0.08);
-        } else if (nameLower.includes('back') || nameLower.includes('father')) {
-          ctx.fillRect(img.width * 0.52, img.height * 0.05, img.width * 0.45, img.height * 0.55);
-          ctx.fillRect(img.width * 0.20, img.height * 0.68, img.width * 0.78, img.height * 0.27);
+          ctx.fillRect(img.width * 0.25, img.height * 0.40, img.width * 0.50, img.height * 0.15);
         } else {
-          ctx.fillRect(img.width * 0.25, img.height * 0.45, img.width * 0.65, img.height * 0.25);
+          ctx.fillRect(img.width * 0.10, img.height * 0.70, img.width * 0.80, img.height * 0.20);
         }
       }
 
       canvas.toBlob((newBlob) => {
-        if (newBlob) newBlob.arrayBuffer().then(resolve);
-        else resolve(buffer);
+        newBlob ? newBlob.arrayBuffer().then(resolve) : resolve(buffer);
       }, fileType);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(buffer); };
@@ -81,13 +78,21 @@ async function applyUniversalPrivacyMask(buffer, fileType, fileName, detections 
 class GlobalUploadInterceptor {
   constructor() { 
     this.isProcessing = false;
+    this.isProgrammaticChange = false; // 🚀 Infinite loop protection guard
     this.initGlobalListeners(); 
   }
+
   initGlobalListeners() {
     window.addEventListener('change', (e) => {
+      // 🚀 Guard: Ignore programmatic triggers to prevent loops
+      if (this.isProgrammaticChange) {
+        this.isProgrammaticChange = false;
+        return;
+      }
       if (this.isProcessing) return;
       try { if (chrome.runtime?.id) this.handleGlobalInputChange(e); } catch (err) {}
     }, true);
+    
     window.addEventListener('drop', (e) => {
       try { if (chrome.runtime?.id) this.handleGlobalDrop(e); } catch (err) {}
     }, true);
@@ -103,9 +108,10 @@ class GlobalUploadInterceptor {
         await interceptUpload(interceptedFiles, e.target, (approvedFiles) => {
           const dataTransfer = new DataTransfer();
           approvedFiles.forEach(f => dataTransfer.items.add(f));
+          
+          this.isProgrammaticChange = true; // 🚀 Flag set before trigger
           e.target.files = dataTransfer.files;
-          const changeEvent = new Event('change', { bubbles: true, cancelable: true });
-          e.target.dispatchEvent(changeEvent);
+          e.target.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
           this.isProcessing = false;
         });
       }
@@ -140,7 +146,6 @@ async function runPipeline(files, settings) {
       const arrayBuffer = await file.arrayBuffer();
       const base64Data = arrayBufferToBase64(arrayBuffer);
 
-      // Send to background
       const response = await new Promise((res) => {
         chrome.runtime.sendMessage({
           type: 'RUN_PROTECT_PIPELINE',
@@ -148,39 +153,14 @@ async function runPipeline(files, settings) {
         }, res);
       });
 
-      let finalDetections = [];
-      let riskLevel = 'low';
-      
-      if (response?.success && response?.data) {
-        finalDetections = response.data.detections || [];
-        riskLevel = response.data.risk || 'high';
-      }
-      
+      let finalDetections = response?.data?.detections || [];
       let outBuffer = (response?.success && response?.data?.base64Data) ? base64ToArrayBuffer(response.data.base64Data) : arrayBuffer;
 
-      // 🛡️ APPLY FAILSAFE MASKS
+      // APPLY MASKS
       outBuffer = await applyUniversalPrivacyMask(outBuffer, file.type, file.name, finalDetections);
 
       const blob = new Blob([outBuffer], { type: file.type });
-      const protectedFile = new File([blob], file.name, { type: file.type, lastModified: Date.now() });
-
-      // Telemetry Sync
-      setTimeout(() => {
-        try {
-          if (!chrome.runtime?.id) return;
-          chrome.runtime.sendMessage({
-            type: 'LOG_SCAN',
-            payload: {
-              scanId: `scan_${Date.now()}`, fileName: file.name, size: file.size,
-              riskLevel: riskLevel, confidence: 0.95, piiCount: finalDetections.length || 2,
-              processingTime: 125, status: 'protected', detections: finalDetections,
-              matchedUrl: window.location.href
-            }
-          });
-        } catch (err) {}
-      }, 5);
-
-      return { success: true, protectedFile };
+      return { success: true, protectedFile: new File([blob], file.name, { type: file.type }) };
     } catch (err) {
       return { success: false, protectedFile: file };
     }

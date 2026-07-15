@@ -8,6 +8,24 @@ class BridgeClient {
 
   async fetchWithRetry(url, options = {}, retries = 3, delay = 1000) {
     let lastError = null;
+    
+    let token = '';
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        const data = await chrome.storage.local.get('sessionToken');
+        token = data?.sessionToken || '';
+      }
+    } catch (err) {
+      console.warn('[BridgeClient] Failed to read sessionToken:', err);
+    }
+
+    if (token) {
+      options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+      };
+    }
+
     for (let i = 0; i < retries; i++) {
       try {
         const response = await fetch(url, options);
@@ -75,14 +93,50 @@ class BridgeClient {
    * Explicit Mapper mapping to LOG_SCAN tracking routine
    */
   async syncScanResult(payload) {
-    console.log('[BridgeClient] Registering scan analytics report metadata...');
-    return this.sendIncidentNotification({
-      assetId: payload?.assetId || 1,
-      matchedUrl: payload?.matchedUrl || 'unknown',
-      matchConfidence: payload?.confidence || 0.85,
-      severity: payload?.riskLevel === 'critical' || payload?.riskLevel === 'high' ? 'High' : 'Normal',
-      status: 'Open'
-    });
+    console.log('[BridgeClient] Syncing scan result telemetry with backend...');
+    const targetEndpoint = `${this.baseUrl}/api/scans`;
+
+    // Safely parse risk Level to numeric risk_score
+    let riskScore = 0.0;
+    if (payload?.riskLevel) {
+      const level = payload.riskLevel.toLowerCase();
+      if (level === 'critical') riskScore = 8.0;
+      else if (level === 'high') riskScore = 6.0;
+      else if (level === 'medium') riskScore = 4.0;
+      else if (level === 'low') riskScore = 1.0;
+    }
+
+    const hasRedactedImage = payload?.status === 'protected';
+    const recommendation = hasRedactedImage ? 'REDACT_MANDATORY' : 'PASS_SAFE';
+
+    const strictPayload = {
+      scan_id: payload?.scanId || `scan_${Date.now()}`,
+      document_context: payload?.matchedUrl || 'unknown',
+      risk_score: riskScore,
+      hits_count: payload?.piiCount || 0,
+      recommendation: recommendation,
+      has_redacted_image: hasRedactedImage
+    };
+
+    try {
+      const response = await this.fetchWithRetry(targetEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(strictPayload)
+      });
+
+      if (!response.ok) {
+        console.warn(`[BridgeClient] Failed to log scan to backend: ${response.status}`);
+      } else {
+        console.log('[BridgeClient] Successfully synced scan log with backend.');
+      }
+      return response;
+    } catch (error) {
+      console.error('[BridgeClient] Error during scan log sync:', error);
+    }
   }
 }
 
