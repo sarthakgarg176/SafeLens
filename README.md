@@ -1252,28 +1252,6 @@ SafeLens is designed to stop accidental privacy leaks before they occur.
 Instead of detecting incidents after sensitive information has already been uploaded, SafeLens proactively intercepts uploads, analyzes content locally, protects confidential information, and provides security teams with real-time visibility.
 
 This privacy-first approach makes SafeLens suitable for enterprise environments where protecting user data is critical.
-
----
-
-# 🎥 Demo Video
-
-A short demonstration video (2–3 minutes) showcases:
-
-- Project overview
-- Problem statement
-- Upload interception
-- OCR processing
-- PII detection
-- Automatic redaction
-- Live dashboard updates
-- End-to-end workflow
-
-📹 **Demo Video**
-
-```text
-Add your YouTube / Google Drive / Loom link here
-```
-
 ---
 
 # 🤝 Contributing
