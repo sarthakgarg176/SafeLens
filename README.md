@@ -1,7 +1,5 @@
 # 🛡️ SafeLens: Privacy Shield AI
 
-![SafeLens Header](https://via.placeholder.com/1200x300/0f172a/38bdf8?text=SafeLens+-+Enterprise+Privacy+Shield+AI)
-
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/sarthakgarg176/SafeLens)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
