@@ -110,6 +110,7 @@ async def upload_scan(
 
 class ExtensionScanPayload(BaseModel):
     scan_id: str
+    filename: str
     document_context: str
     risk_score: float
     hits_count: int
@@ -120,7 +121,7 @@ class ExtensionScanPayload(BaseModel):
 async def create_scan(payload: ExtensionScanPayload, db: Session = Depends(get_db)):
     # 1. Create a new record in the Asset table
     new_asset = Asset(
-        filename=f"scan_{payload.scan_id}",
+        filename=payload.filename,
         status="Redacted" if payload.has_redacted_image else "Protected",
         confidence_before=payload.risk_score,
         timestamp=datetime.now(timezone.utc)
