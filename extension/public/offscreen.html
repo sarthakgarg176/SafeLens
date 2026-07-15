@@ -1,16 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>SafeLens Offscreen Processor</title>
-    <!-- 
-      Load OpenCV.js synchronously via standard script tag.
-      Since this runs in an offscreen DOM context, it compiles and runs standard UMD
-      without violating CSP or needing eval() / importScripts() inside the service worker.
-    -->
-    <script src="/opencv.js"></script>
-  </head>
-  <body>
-    <script type="module" src="../src/background/offscreen.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <title>SafeLens Offscreen Document</title>
+</head>
+<body>
+  <!-- 🚀 Is iframe ka id 'sandboxFrame' hona must hai, aur src sahi hona chahiye -->
+  <iframe id="sandboxFrame" src="sandbox.html"></iframe>
+  
+  <!-- Offscreen script ko body ke end mein load karte hain taaki DOM structure ready ho chuka ho -->
+  <script type="module" src="../src/background/offscreen.js"></script>
+</body>
 </html>

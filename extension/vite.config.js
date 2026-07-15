@@ -1,27 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 
-/**
- * Vite Config for Local Development & HMR
- * 
- * Responsibility:
- * - Provides a fast development server on port 3000.
- * - Supports Hot Module Replacement (HMR) for designing the Popup React UI.
- * 
- * Usage:
- * - Run `npm run dev` to launch the dev server in the browser.
- */
 export default defineConfig({
-  plugins: [react()],
-  publicDir: false,
-  server: {
-    port: 3000,
-    open: '/public/popup.html',
-  },
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
+  plugins: [react(), tailwindcss()],
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      external: ['/opencv.js'], // Vite isse touch nahi karega
+      input: {
+        popup: resolve(__dirname, 'public/popup.html'),
+        offscreen: resolve(__dirname, 'src/background/offscreen.js'),
+        sandbox: resolve(__dirname, 'public/sandbox.html'),
+      },
+      output: {
+        // Yahan `false` set karna zaruri hai
+        inlineDynamicImports: false, 
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+      },
     },
   },
 });

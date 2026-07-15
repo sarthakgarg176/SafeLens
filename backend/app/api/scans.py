@@ -101,7 +101,7 @@ async def upload_scan(
 
     return {
         "success": True,
-        "fileUrl": f"http://localhost:8000/uploads/{filename}",
+        "fileUrl": f"https://safelens-zttx.onrender.com/uploads/{filename}",
         "fingerprint": {
             "phash": phash,
             "whash": whash

@@ -62,7 +62,7 @@ export default function ScanSummary({ scanRecord, onBack }) {
     if (!incidentId) return;
     setReportState({ loading: true, url: null, error: null, id: null });
     try {
-      const response = await fetch(`http://localhost:8000/api/report?incident_id=${incidentId}`, {
+      const response = await fetch(`https://safelens-zttx.onrender.com/api/report?incident_id=${incidentId}`, {
         method: 'POST'
       });
       if (!response.ok) {

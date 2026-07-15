@@ -40,7 +40,7 @@ export function cloneCanvas(canvas) {
   clone.width = canvas.width;
   clone.height = canvas.height;
   
-  const ctx = clone.getContext('2d');
+  const ctx = clone.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(canvas, 0, 0);
   return clone;
 }
@@ -89,7 +89,7 @@ export async function redactCanvasRegions(canvas, regions, mode = 'redact', opti
   // 3. Merge overlapping and adjacent boxes to optimize drawing
   const mergedRegions = mergeBoxes(paddedRegions);
 
-  const ctx = protectedCanvas.getContext('2d');
+  const ctx = protectedCanvas.getContext('2d', { willReadFrequently: true });
 
   // 4. Apply selected protection mode
   if (mode === 'redact') {
@@ -126,7 +126,7 @@ export async function redactCanvasRegions(canvas, regions, mode = 'redact', opti
  * @param {number} scale - Cell pixel size scale
  */
 function pixelateCanvasRegions(canvas, regions, scale = 8) {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   regions.forEach((region) => {
     const { x, y, width, height } = region;
