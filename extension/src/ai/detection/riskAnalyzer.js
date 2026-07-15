@@ -1,20 +1,19 @@
 /**
  * Document Risk Assessment Engine
- * Evaluates text PII and QR Codes to generate a document risk score.
+ * 
+ * Responsibility:
+ * - Grades the overall security threat level of a scanned document.
+ * - Computes a weighted score based on detection type severity, counts, and confidence levels.
+ * - Classifies final risk rating into: LOW, MEDIUM, HIGH, or CRITICAL.
+ * - Formats the final ScanResult summary report.
+ * 
+ * Input/Output Contract:
+ * - Input: Object[] (Fused PII detections)
+ * - Output: { riskLevel: 'low'|'medium'|'high'|'critical', score: number, detections: Object[] }
+ * 
+ * Interacts with:
+ * - extension/src/services/scanService.js (Feeds the final scan metadata)
  */
-
-// Mapping of detection types to their base severity for weighting
-const TYPE_SEVERITY = {
-  AADHAAR: 'critical',
-  PAN: 'critical',
-  PASSPORT: 'critical',
-  QR_CODE: 'critical', // NEW: Ensures QR codes trigger immediate redaction
-  DRIVING_LICENSE: 'high',
-  CREDIT_CARD: 'high',
-  EMAIL: 'medium',
-  PHONE: 'medium',
-  DEFAULT: 'medium'
-};
 
 const SEVERITY_POINTS = {
   critical: 10,
@@ -25,6 +24,13 @@ const SEVERITY_POINTS = {
 
 /**
  * Evaluates detections list and calculates the aggregate document risk score and level.
+ * 
+ * @param {Object[]} detections - Clean list of fused PII detections
+ * @returns {{
+ *   riskLevel: 'low'|'medium'|'high'|'critical',
+ *   score: number,
+ *   detections: Object[]
+ * }} Document risk report
  */
 export function analyzeRisk(detections) {
   if (!Array.isArray(detections) || detections.length === 0) {
@@ -39,27 +45,24 @@ export function analyzeRisk(detections) {
   let hasHighConfidenceCritical = false;
 
   detections.forEach((det) => {
-    // Determine severity based on detected type if not already set
-    const severity = det.severity || TYPE_SEVERITY[det.type] || TYPE_SEVERITY.DEFAULT;
-    const points = SEVERITY_POINTS[severity] || 2;
-    
-    // Use confidence score provided by detection, default to 0.8
+    const points = SEVERITY_POINTS[det.severity] || 2;
     const confidence = typeof det.fusedConfidence === 'number' ? det.fusedConfidence : 0.8;
     
     // Add weighted points to total score
     totalScore += points * confidence;
 
-    // Elevation condition: any critical PII (Aadhaar/PAN/QR)
-    if (severity === 'critical' && confidence >= 0.50) {
+    // Direct elevation condition: any credentials/keys matched with high confidence
+    if (det.severity === 'critical' && confidence >= 0.70) {
       hasHighConfidenceCritical = true;
     }
   });
 
-  // Assign risk level based on score bounds and critical elements
+  // Assign risk level based on cumulative score bounds and high-severity matches
   let riskLevel = 'low';
-  if (hasHighConfidenceCritical || totalScore >= 8) {
+
+  if (hasHighConfidenceCritical || totalScore >= 15) {
     riskLevel = 'critical';
-  } else if (totalScore >= 4) {
+  } else if (totalScore >= 5) {
     riskLevel = 'high';
   } else if (totalScore >= 2) {
     riskLevel = 'medium';

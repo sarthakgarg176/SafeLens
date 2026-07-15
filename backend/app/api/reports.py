@@ -21,7 +21,12 @@ async def generate_report(
     ).first()
 
     report_id = str(uuid.uuid4())[:8]
-    report_path = f"app/storage/reports/report_{report_id}.pdf"
+    report_dir = "app/storage/reports"
+    import os
+    os.makedirs(report_dir, exist_ok=True)
+    report_path = f"{report_dir}/report_{report_id}.pdf"
+    with open(report_path, "w") as f:
+        f.write("%PDF-1.4 Mock SafeLens PDF Report Content")
 
     return {
         "success": True,
@@ -29,7 +34,7 @@ async def generate_report(
         "data": {
             "report_id": report_id,
             "report_type": action.action_type if action else "General",
-            "download_url": report_path,
+            "download_url": f"http://localhost:8000/storage/reports/report_{report_id}.pdf",
             "generated_at": datetime.now(timezone.utc).isoformat()
         },
         "timestamp": datetime.now(timezone.utc).isoformat()

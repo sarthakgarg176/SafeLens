@@ -31,3 +31,4 @@ dist-ssr
 *.sln
 *.sw?
 >>>>>>> c5f96275869adb5b3c4208ccb5c227022beb3bfa
+safelens.db

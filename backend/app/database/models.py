@@ -32,7 +32,7 @@ class Asset(Base):
 class Alert(Base):
     __tablename__ = "alerts"
     id = Column(Integer, primary_key=True, index=True)
-    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False, unique=True)
     matched_url = Column(String, nullable=False)
     match_confidence = Column(Float, nullable=True)
     severity = Column(String, default="Normal")
