@@ -8,19 +8,25 @@ import { executeOffscreenTask } from '../../background/offscreenManager.js';
 export async function preprocessImage(imageSource, options = {}) {
   // Offscreen handling (Service Worker)
   if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
-    // ... (Keep existing offscreen delegation logic here)
-    return imageSource; // Placeholder for logic
+    return imageSource;
   }
 
   const {
-    enableDenoise = false, // ID cards ke liye false rakha hai
+    enableDenoise = false,
     enableDeskew = true,
-    thresholdValue = 0,    // 0 = Skip thresholding to preserve edges
+    thresholdValue = 0,
     maxWidth = 1920,
-    maxHeight = 1080
+    maxHeight = 1080,
+    bypass = false
   } = options;
 
   console.log('[Preprocessor] Beginning Safe-Mode pipeline...');
+
+  if (bypass) {
+    console.log('[Preprocessor] Bypass mode - returning raw canvas');
+    return imageSource;
+  }
+
   let canvas = imageSource;
 
   try {
