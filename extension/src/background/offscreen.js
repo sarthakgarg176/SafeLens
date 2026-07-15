@@ -93,16 +93,62 @@ chrome.runtime.onConnect.addListener((port) => {
            corePath: chrome.runtime.getURL('tesseract/tesseract-core.wasm.js'),
            workerBlobURL: false 
         });
+        await worker.setParameters({
+          tessedit_pageseg_mode: '3',   
+          tessedit_create_hocr: '1',    
+          tessedit_create_tsv: '1'      
+        });
         // 🚀 Improved OCR call with PSM 6 for better accuracy on blocks of text
         const ocr = await worker.recognize(pngDataUrl, { psm: '6' });
         await worker.terminate();
-        const formattedWords = (ocr?.data?.words || []).map(w => ({
+        let words = ocr?.data?.words || [];
+        if (words.length === 0 && ocr?.data?.lines) {
+           ocr.data.lines.forEach(line => { if (line.words) words.push(...line.words); });
+        }
+        if (words.length === 0 && ocr?.data?.blocks) {
+           ocr.data.blocks.forEach(block => {
+               if (block.paragraphs) {
+                   block.paragraphs.forEach(para => {
+                       if (para.lines) {
+                           para.lines.forEach(line => {
+                               if (line.words) words.push(...line.words);
+                           });
+                       }
+                   });
+               }
+           });
+        }
+
+        const formattedWords = words.map(w => ({
           text: w.text || "",
           x: w.bbox?.x0 || 0, y: w.bbox?.y0 || 0,
           width: (w.bbox?.x1 || 0) - (w.bbox?.x0 || 0),
           height: (w.bbox?.y1 || 0) - (w.bbox?.y0 || 0)
         }));
         port.postMessage({ success: true, data: { words: formattedWords, text: ocr?.data?.text || "" } });
+      } catch (e) {
+        port.postMessage({ success: false, error: e.message });
+      }
+    }
+
+    if (msg.type === 'CLASSIFY_TEXT') {
+      try {
+        let topic = 'Unknown';
+        let confidence = 0.5;
+        const lowerText = (msg.payload.text || '').toLowerCase();
+        
+        if (lowerText.includes('aadhaar') || lowerText.includes('adhar') || lowerText.includes('uidai')) {
+           topic = 'Aadhaar Card';
+           confidence = 0.95;
+        } else if (lowerText.includes('pan') || lowerText.includes('income tax')) {
+           topic = 'PAN Card';
+           confidence = 0.95;
+        } else if (lowerText.includes('account') || lowerText.includes('bank') || lowerText.includes('ifsc')) {
+           topic = 'Financial Statement';
+           confidence = 0.90;
+        }
+
+        port.postMessage({ success: true, data: { topic, confidence } });
       } catch (e) {
         port.postMessage({ success: false, error: e.message });
       }
