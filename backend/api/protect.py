@@ -1,143 +1,46 @@
-import os, shutil, uuid
-from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
-from sqlalchemy.orm import Session
-from database.connection import get_db
-from database.models import Asset
-from datetime import datetime, timezone
-import imagehash
-from PIL import Image
+# api/protect.py
+
+from fastapi import APIRouter, BackgroundTasks
+from pydantic import BaseModel
 from graph_engine.workflow import workflow_app
+from api.websocket import manager
+import uuid
 
 router = APIRouter()
 
-UPLOAD_DIR = str(Path(__file__).resolve().parent.parent / "storage" / "uploads")
-THUMB_DIR = str(Path(__file__).resolve().parent.parent / "storage" / "thumbnails")
-
-ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
-MAX_SIZE_MB = 10
+class ProtectRequest(BaseModel):
+    target_domain: str
+    text: str
+    pii_type: str
 
 @router.post("/protect")
-async def protect_image(
-    image: UploadFile = File(...),
-    blur_enabled: bool = Form(False),
-    ai_cloak: bool = Form(False),
-    watermark: bool = Form(False),
-    db: Session = Depends(get_db)
-):
-    # Validate MIME type
-    if image.content_type not in ALLOWED_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "error": f"Unsupported file type: {image.content_type}",
-                "code": "INVALID_FILE_TYPE",
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    os.makedirs(THUMB_DIR, exist_ok=True)
-
-    asset_id = str(uuid.uuid4())[:8]
-    filename = f"protected_{asset_id}_{image.filename}"
-    file_path = f"{UPLOAD_DIR}/{filename}"
-
-    # Save file
-    content = await image.read()
-
-    # Validate file size
-    if len(content) > MAX_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "error": f"File too large. Max size is {MAX_SIZE_MB}MB",
-                "code": "FILE_TOO_LARGE",
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Validate image can be opened
-    try:
-        img = Image.open(file_path)
-        img.verify()
-        img = Image.open(file_path)
-    except Exception:
-        os.remove(file_path)
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "error": "Corrupted or invalid image file",
-                "code": "INVALID_IMAGE",
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-    # Generate hashes from ORIGINAL image
-    phash = str(imagehash.phash(img))
-    whash = str(imagehash.whash(img))
-
-    # Watermark ID
-    watermark_id = f"WM{uuid.uuid4().hex[:6].upper()}"
-
-    # Save thumbnail
-    thumb_path = f"{THUMB_DIR}/{asset_id}_thumb.png"
-    img.thumbnail((200, 200))
-    img.save(thumb_path)
-
-    # Save to database
-    new_asset = Asset(
-        filename=image.filename,
-        source_website=None,
-        thumbnail_path=f"https://safelens-zttx.onrender.com/storage/thumbnails/{asset_id}_thumb.png",
-        phash=phash,
-        whash=whash,
-        watermark_id=watermark_id,
-        status="Protected",
-        timestamp=datetime.now(timezone.utc)
-    )
-    try:
-        db.add(new_asset)
-        db.commit()
-        db.refresh(new_asset)
-    except Exception as e:
-        db.rollback()
-        # Clean up physically created files on database failure
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        if os.path.exists(thumb_path):
-            os.remove(thumb_path)
-        raise HTTPException(status_code=500, detail=f"Database registration failed: {str(e)}")
-
-    # Invoke LangGraph workflow
-    state = {
-        "task_type": "protect",
+async def protect_data(request: ProtectRequest, background_tasks: BackgroundTasks):
+    req_id = str(uuid.uuid4())
+    
+    # Format state for LangGraph
+    initial_state = {
+        "request_id": req_id,
+        "file_name": "text_payload",
+        "target_domain": request.target_domain,
         "input_data": {
-            "text": image.filename,
-            "file_path": file_path
-        }
-    }
-    workflow_result = workflow_app.invoke(state)
-    graph_data = workflow_result.get("result", {})
-
-    return {
-        "success": True,
-        "message": "Image protected",
-        "data": {
-            "asset_id": new_asset.id,
-            "status": "Protected",
-            "watermark_id": watermark_id,
-            "phash": phash,
-            "whash": whash,
-            "protected_image_path": f"https://safelens-zttx.onrender.com/storage/uploads/{filename}",
-            "thumbnail_path": f"https://safelens-zttx.onrender.com/storage/thumbnails/{asset_id}_thumb.png",
-            "created_at": new_asset.timestamp.isoformat()
+            "text": request.text,
+            "pii_type": request.pii_type
         },
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "logs": []
+    }
+    
+    # 1. Run the Agentic Workflow
+    result = workflow_app.invoke(initial_state)
+    
+    # 2. Broadcast all step-by-step logs to the Dashboard asynchronously
+    for log in result.get("logs", []):
+        log["request_id"] = req_id
+        background_tasks.add_task(manager.broadcast, log)
+        
+    # 3. Return the final decision back to the Browser Extension
+    return {
+        "request_id": req_id,
+        "status": result.get("execution_status"),
+        "decoy_applied": result.get("decoy_applied"),
+        "payload": result.get("synthetic_payload", {})
     }

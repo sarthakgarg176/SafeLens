@@ -1,31 +1,48 @@
+# test_langgraph_workflow.py
+
 import unittest
 from graph_engine.workflow import workflow_app
 
 class TestLangGraphWorkflow(unittest.TestCase):
+
     def test_protect_node(self):
-        state = {
-            "task_type": "protect",
+        # Test case where a decoy should be triggered
+        initial_state = {
+            "request_id": "req_123",
+            "file_name": "test_id.png",
+            "target_domain": "untrusted_form.com",
             "input_data": {
-                "text": "Contact me at test@example.com or 555-123-4567"
-            }
+                "text": "234567890123",
+                "pii_type": "AADHAAR"
+            },
+            "logs": []
         }
-        result = workflow_app.invoke(state)
         
-        # Verify the synthesizer ran via the protect_node
-        protected_text = result["result"]["protected_text"]
-        self.assertIn("[REDACTED_EMAIL]", protected_text)
-        self.assertIn("[REDACTED_PHONE]", protected_text)
-        self.assertEqual(result["result"]["status"], "protected")
+        result = workflow_app.invoke(initial_state)
+        
+        # Verify execution status and decoy application
+        self.assertTrue(result.get("decoy_applied"))
+        self.assertEqual(result.get("execution_status"), "DECOYED")
+        self.assertIn("synthetic_payload", result)
 
     def test_scan_node(self):
-        state = {
-            "task_type": "scan",
+        # Test case where domain is whitelisted / safe pass
+        initial_state = {
+            "request_id": "req_124",
+            "file_name": "secure_doc.pdf",
+            "target_domain": "internal-bank.com",
             "input_data": {
-                "text": "test_image.png"
-            }
+                "text": "Safe corporate document text",
+                "pii_type": "NONE"
+            },
+            "logs": []
         }
-        result = workflow_app.invoke(state)
-        self.assertEqual(result["result"]["status"], "scanned")
         
-if __name__ == '__main__':
+        result = workflow_app.invoke(initial_state)
+        
+        # Verify safe pass execution
+        self.assertFalse(result.get("decoy_applied"))
+        self.assertEqual(result.get("execution_status"), "SUCCESS")
+
+if __name__ == "__main__":
     unittest.main()
