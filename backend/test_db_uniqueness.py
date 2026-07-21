@@ -1,15 +1,20 @@
 import unittest
 import os
+import logging
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Import the actual FastAPI app and db sessions
-from app.main import app
-from app.database.connection import Base, get_db
-from app.database.models import Asset, Alert, Action
-from app.api.incidents import IncidentCreate
+from main import app
+from database.connection import Base, get_db
+from database.models import Asset, Alert, Action
+from api.incidents import IncidentCreate
 from datetime import datetime, timezone
+from pathlib import Path
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # We will override the database dependency to use a clean test database file
 class TestBackendAPI(unittest.TestCase):
@@ -87,7 +92,7 @@ class TestBackendAPI(unittest.TestCase):
         self.assertEqual(res1.status_code, 200)
         data1 = res1.json()
         self.assertTrue(data1["success"])
-        self.assertEqual(data1["message"], "Incident created successfully")
+        self.assertEqual(data1["message"], "Incident logged successfully")
         incident_id = data1["data"]["incident_id"]
 
         # 2. Second POST: Try to create again for same asset_id, should return "already logged" (idempotency)
@@ -137,11 +142,11 @@ class TestBackendAPI(unittest.TestCase):
         report_id = data["data"]["report_id"]
         
         # Verify download URL structure
-        self.assertEqual(download_url, f"http://localhost:8000/storage/reports/report_{report_id}.pdf")
+        self.assertEqual(download_url, f"https://safelens-zttx.onrender.com/storage/reports/report_{report_id}.pdf")
 
         # 3. Physically create the mock report file in the local filesystem storage path
         report_filename = f"report_{report_id}.pdf"
-        report_file_dir = "app/storage/reports"
+        report_file_dir = str(Path(__file__).resolve().parent / "storage" / "reports")
         os.makedirs(report_file_dir, exist_ok=True)
         report_file_path = os.path.join(report_file_dir, report_filename)
         

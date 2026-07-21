@@ -5,9 +5,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi.testclient import TestClient
-from app.main import app
-from app.database.connection import SessionLocal
-from app.database.models import Asset, Alert, Action
+from main import app
+from database.connection import SessionLocal
+from database.models import Asset, Alert, Action
 
 def run_tests():
     # Clean up any previous test runs from the SQLite database

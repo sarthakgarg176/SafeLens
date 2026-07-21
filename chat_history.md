@@ -1206,3 +1206,20 @@ I have fixed the dynamic update issue properly by implementing two architectural
 
 The extension and dashboard projects have both compiled successfully. Reload the extension, refresh the dashboard page, and drop an image—it will update all metrics and incidents list instantly!
 
+
+## Turn: LangGraph Agentic Architecture Upgrade & Backend Restructuring
+
+**User Request:**
+1. Execute backend restructuring to transition "SafeLens" to a LangGraph-based architecture (`safelens-backend/`).
+2. Update all Python imports across `api/`, `services/`, `security/`, and `workers/` to reflect the flat hierarchy.
+3. Standardize absolute paths (`Path(__file__).resolve().parent`) for file handling and database URLs.
+4. Update `start.bat` (`PYTHONPATH=.`, `cd /d %~dp0`, `uvicorn main:app`).
+5. Create `graph_engine/workflow.py` (`StateGraph`) and `decoy_synthesis/synthesizer.py`.
+6. Update `chat_history.md` and `prompts` folder accordingly.
+
+**Agent Reply:**
+1. **Directory Restructuring & Flat Hierarchy:** Moved `backend/app/*` to `safelens-backend/`, created `graph_engine/`, `decoy_synthesis/`, and `rag_pipeline/`. Updated all imports to reflect the flat module structure.
+2. **Absolute Path Standardization:** Updated SQLite database path in `database/connection.py`, storage directories in `main.py`, `api/protect.py`, `api/scan.py`, `api/scans.py`, `api/reports.py`, and `test_db_uniqueness.py` to use `Path(__file__).resolve().parent` anchors.
+3. **LangGraph StateGraph Integration:** Implemented `graph_engine/workflow.py` defining a LangGraph `StateGraph` and `decoy_synthesis/synthesizer.py` implementing `DecoySynthesizer` for dynamic PII masking. Wired endpoint handlers in `protect.py` and `scan.py` to route through the `workflow_app`.
+4. **Configuration & Testing:** Updated `start.bat` to include `set PYTHONPATH=.` and corrected the server start command. Created `test_langgraph_workflow.py` and ran `python -m unittest discover` (all 4 unit tests passed).
+5. **Documentation & Prompts:** Created `prompts/langgraph-backend.md` to establish rules for the new architecture and updated `chat_history.md`.
