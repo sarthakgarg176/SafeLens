@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "SafeLens Privacy Shield AI",
+  "version": "2.0.0",
+  "description": "Enterprise security extension for Privacy Shield AI - Zero-click context-aware routing and synthetic decoy protection.",
+
+  "permissions": [
+    "webRequest",
+    "declarativeNetRequest",
+    "storage",
+    "activeTab"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "content-scripts/domain-checker.js",
+        "content-scripts/interceptor.js",
+        "content-scripts/toast-injector.js"
+      ],
+      "css": [
+        "styles/toast.css",
+        "styles/overlay.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/shield-protected.svg",
+      "48": "assets/icons/shield-protected.svg",
+      "128": "assets/icons/shield-protected.svg"
+    }
+  },
+
+  "icons": {
+    "16": "assets/icons/shield-protected.svg",
+    "48": "assets/icons/shield-protected.svg",
+    "128": "assets/icons/shield-protected.svg"
+  },
+
+ 
+  "web_accessible_resources": [
+  {
+    "resources": ["assets/icons/*.svg", "config/*.json", "styles/*.css"],
+    "matches": ["<all_urls>"]
+  }
+]
+}
