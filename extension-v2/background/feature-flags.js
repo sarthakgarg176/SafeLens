@@ -9,6 +9,10 @@ export async function getSettings() {
   const stored = await chrome.storage.local.get(null);
 
   if (stored && Object.keys(stored).length > 0) {
+    if (stored.newAgentApiEndpoint === '/api/v2/process-upload') {
+      stored.newAgentApiEndpoint = '/api/protect';
+      await chrome.storage.local.set({ newAgentApiEndpoint: '/api/protect' });
+    }
     return stored;
   }
 
