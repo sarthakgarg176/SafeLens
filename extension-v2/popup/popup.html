@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SafeLens</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-card">
+    <h1>SafeLens Privacy Shield</h1>
+    <p class="popup-subtitle">Agentic protection controls</p>
+
+    <div class="toggle-row">
+      <span>Use New Agentic Engine</span>
+      <label class="switch">
+        <input type="checkbox" id="useNewAgentToggle" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="status-line">
+      <span id="statusDot" class="safelens-status-dot safelens-status-dot--success"></span>
+      <span id="statusText">Protection Active</span>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
