@@ -4,7 +4,7 @@ import struct
 import requests
 from datetime import datetime, timezone
 
-BACKEND_URL = "http://localhost:8000/api"
+BACKEND_URL = "https://safelens-zttx.onrender.com/api"
 
 def read_message():
     raw_length = sys.stdin.buffer.read(4)

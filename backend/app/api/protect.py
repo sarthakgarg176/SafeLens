@@ -93,7 +93,7 @@ async def protect_image(
     new_asset = Asset(
         filename=image.filename,
         source_website=None,
-        thumbnail_path=f"http://localhost:8000/storage/thumbnails/{asset_id}_thumb.png",
+        thumbnail_path=f"https://safelens-zttx.onrender.com/storage/thumbnails/{asset_id}_thumb.png",
         phash=phash,
         whash=whash,
         watermark_id=watermark_id,
@@ -122,8 +122,8 @@ async def protect_image(
             "watermark_id": watermark_id,
             "phash": phash,
             "whash": whash,
-            "protected_image_path": f"http://localhost:8000/storage/uploads/{filename}",
-            "thumbnail_path": f"http://localhost:8000/storage/thumbnails/{asset_id}_thumb.png",
+            "protected_image_path": f"https://safelens-zttx.onrender.com/storage/uploads/{filename}",
+            "thumbnail_path": f"https://safelens-zttx.onrender.com/storage/thumbnails/{asset_id}_thumb.png",
             "created_at": new_asset.timestamp.isoformat()
         },
         "timestamp": datetime.now(timezone.utc).isoformat()

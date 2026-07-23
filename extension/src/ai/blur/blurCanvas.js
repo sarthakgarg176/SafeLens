@@ -31,7 +31,7 @@ export async function blurCanvasRegions(canvas, regions, blurRadius = 15) {
     return canvas;
   }
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.save(); // Save base state
 
   try {
@@ -55,7 +55,7 @@ export async function blurCanvasRegions(canvas, regions, blurRadius = 15) {
       tempCanvas.width = drawW;
       tempCanvas.height = drawH;
 
-      const tempCtx = tempCanvas.getContext('2d');
+      const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
       tempCtx.drawImage(canvas, drawX, drawY, drawW, drawH, 0, 0, drawW, drawH);
 
       // 2. Configure original canvas clipping region to restrict blur leakage

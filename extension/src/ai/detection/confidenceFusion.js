@@ -1,21 +1,8 @@
 /**
  * Confidence Fusion Engine
- * 
- * Responsibility:
- * - Combines pattern matching confidence and character recognition confidence.
- * - Filters out false positives by discarding matches where validation rules failed.
- * - Computes a unified Bayesian-style confidence rating.
- * - Formats standard output payloads.
- * 
- * Input/Output Contract:
- * - Input: Object[] (Detections with rule validation metadata)
- * - Output: Object[] (Detections containing fused confidence scores)
- * 
- * Interacts with:
- * - extension/src/ai/detection/regexDetector.js & ruleEngine.js (Consumes their attributes)
+ * Logic: Merges Regex detections and Semantic AI predictions for a robust risk score.
  */
 
-// Severity weights mapped to PII types
 const SEVERITY_LEVELS = {
   EMAIL: 'medium',
   PHONE: 'low',
@@ -33,47 +20,45 @@ const SEVERITY_LEVELS = {
   PASSWORD_PATTERNS: 'critical'
 };
 
-/**
- * Filters out failed validation matches and fuses OCR & Regex confidence ratings.
- * 
- * @param {Object[]} detections - Validated candidate detections
- * @returns {Object[]} Fused and filtered detections
- */
-export function fuseConfidences(detections) {
-  if (!Array.isArray(detections)) {
-    return [];
-  }
+export function fuseConfidence(regexDetections, semanticResult) {
+  const WEIGHT_REGEX = 0.6;
+  const WEIGHT_SEMANTIC = 0.4;
+  
+  // 1. Process Detections
+  const fusedDetections = regexDetections.map((det) => {
+    let ocrConf = typeof det.ocrConfidence === 'number' ? det.ocrConfidence : 0.5;
+    let regexConf = typeof det.regexConfidence === 'number' ? det.regexConfidence : 0.8;
 
-  return detections
-    .filter((det) => {
-      // 1. Drop false positives (e.g. failing Aadhaar/Luhn checks)
-      if (det.rulePassed === false) {
-        console.log(`[ConfidenceFusion] Dropping false positive: [${det.type}] "${det.value}" (failed checksum validation).`);
-        return false;
-      }
-      return true;
-    })
-    .map((det) => {
-      const ocrConf = typeof det.ocrConfidence === 'number' ? det.ocrConfidence : 0.5;
-      const regexConf = typeof det.regexConfidence === 'number' ? det.regexConfidence : 0.8;
+    if (det.rulePassed === false) {
+      console.warn(`[ConfidenceFusion] Rule validation failed for [${det.type}]. Keeping for safety.`);
+      ocrConf *= 0.1; 
+      regexConf *= 0.1;
+    }
 
-      // 2. Bayes-like weighted fusion (70% structural regex confidence, 30% OCR legibility confidence)
-      let fused = 0.7 * regexConf + 0.3 * ocrConf;
+    let fused = 0.7 * regexConf + 0.3 * ocrConf;
+    fused = Math.min(1.0, Math.max(0.0, fused));
 
-      // Clamp value between 0.0 and 1.0
-      fused = Math.min(1.0, Math.max(0.0, fused));
+    return {
+      ...det,
+      fusedConfidence: parseFloat(fused.toFixed(4)),
+      severity: SEVERITY_LEVELS[det.type] || 'medium'
+    };
+  });
 
-      return {
-        type: det.type,
-        value: det.value,
-        ocrConfidence: ocrConf,
-        regexConfidence: regexConf,
-        fusedConfidence: parseFloat(fused.toFixed(4)),
-        severity: SEVERITY_LEVELS[det.type] || 'medium',
-        startIndex: det.startIndex,
-        endIndex: det.endIndex,
-        bboxes: det.bboxes || [],
-        source: det.source || 'regex'
-      };
-    });
+  // 2. Semantic Score Integration
+  const sensitiveLabels = ['Government ID', 'Financial Statement', 'Medical Record', 'Passport', 'Aadhaar Card', 'PAN Card'];
+  const isSensitiveTopic = sensitiveLabels.includes(semanticResult.topic);
+  
+  // Higher weight if semantic model is confident
+  const finalSemanticScore = isSensitiveTopic ? semanticResult.confidence : 0.0;
+
+  return {
+    fusedDetections,
+    semanticContext: {
+      topic: semanticResult.topic,
+      confidence: semanticResult.confidence,
+      isSensitive: isSensitiveTopic
+    },
+    finalGlobalScore: (fusedDetections.length > 0 ? 0.9 : 0.1) * WEIGHT_REGEX + (finalSemanticScore * WEIGHT_SEMANTIC)
+  };
 }

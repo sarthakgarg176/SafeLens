@@ -42,7 +42,7 @@ function createInterceptor(type) {
     }
 
     let files = null;
-    const targetElement = event.currentTarget || event.target;
+    const targetElement = event.target;
 
     // 2. Extract file assets based on event type
     if (type === 'change' && event.target.files) {
@@ -63,14 +63,16 @@ function createInterceptor(type) {
 
     // 4. Formulate the re-trigger callback to execute after scan approval
     const onApprovalCallback = (approvedFiles) => {
-      console.log(`[DOMObserver] Re-injecting and triggering event: ${type}`, { fileCount: approvedFiles.length });
+      console.log(`[DOMObserver] Re-injecting and triggering event: ${type} on targetElement: ${targetElement ? targetElement.constructor.name : 'null'}`, { fileCount: approvedFiles.length });
       
       const dataTransfer = new DataTransfer();
       Array.from(approvedFiles).forEach((file) => dataTransfer.items.add(file));
 
       if (type === 'change') {
         // Assign files to input
-        targetElement.files = dataTransfer.files;
+        if (targetElement instanceof HTMLInputElement) {
+          targetElement.files = dataTransfer.files;
+        }
 
         // Dispatch cloned change event
         const changeEvent = new Event('change', { bubbles: true, cancelable: true });

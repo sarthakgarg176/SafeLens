@@ -1,0 +1,9 @@
+{
+  "USE_NEW_AGENT": false,
+  "notificationsEnabled": true,
+  "notificationPosition": "top-right",
+  "notificationDurationMs": 3500,
+  "backendApiBaseUrl": "http://127.0.0.1:8000",
+  "legacyApiEndpoint": "/api/protect",
+  "newAgentApiEndpoint": "/api/v2/process-upload"
+}

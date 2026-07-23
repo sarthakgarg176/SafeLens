@@ -28,7 +28,7 @@ export async function applyPerturbations(canvas, strength) {
       throw new TypeError('Canvas parameter is required');
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const width = canvas.width;
     const height = canvas.height;
     const imgData = ctx.getImageData(0, 0, width, height);
@@ -63,7 +63,7 @@ export async function applyPerturbations(canvas, strength) {
     outputCanvas.width = width;
     outputCanvas.height = height;
 
-    const outCtx = outputCanvas.getContext('2d');
+    const outCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
     outCtx.putImageData(imgData, 0, 0);
 
     return outputCanvas;

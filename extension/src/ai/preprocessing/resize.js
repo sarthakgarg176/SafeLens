@@ -60,7 +60,7 @@ export async function resizeCanvas(canvas, maxWidth = 1920, maxHeight = 1080) {
       throw new Error('OpenCV.js runtime is not loaded');
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     // 1. Allocate WebAssembly Mat representations
@@ -78,7 +78,7 @@ export async function resizeCanvas(canvas, maxWidth = 1920, maxHeight = 1080) {
     outputCanvas.width = width;
     outputCanvas.height = height;
 
-    const outCtx = outputCanvas.getContext('2d');
+    const outCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
     const outImgData = new ImageData(new Uint8ClampedArray(dst.data), dst.cols, dst.rows);
     outCtx.putImageData(outImgData, 0, 0);
 
@@ -108,7 +108,7 @@ export async function resizeCanvas(canvas, maxWidth = 1920, maxHeight = 1080) {
       fallbackCanvas.width = newWidth;
       fallbackCanvas.height = newHeight;
 
-      const fallbackCtx = fallbackCanvas.getContext('2d');
+      const fallbackCtx = fallbackCanvas.getContext('2d', { willReadFrequently: true });
       fallbackCtx.imageSmoothingEnabled = true;
       fallbackCtx.imageSmoothingQuality = 'high';
       fallbackCtx.drawImage(canvas, 0, 0, newWidth, newHeight);

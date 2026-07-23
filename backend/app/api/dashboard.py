@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
 from ..database.models import Asset, Alert
@@ -30,25 +31,29 @@ def get_dashboard(db: Session = Depends(get_db)):
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-from ..database.ledger import SCAN_LEDGER
-
 @router.get("/dashboard/stats")
-async def get_dashboard_stats():
-    total_files_processed = len(SCAN_LEDGER)
+async def get_dashboard_stats(db: Session = Depends(get_db)):
+    total_files_processed = db.query(Asset).count()
+    total_threats_intercepted = db.query(Alert).count()
+
+    avg_score = db.query(func.avg(Asset.confidence_before)).scalar()
+    average_risk_score = round(avg_score, 2) if avg_score is not None else 0.0
+
+    recent_assets = db.query(Asset).order_by(Asset.timestamp.desc()).limit(20).all()
     
-    total_threats_intercepted = sum(
-        1 for scan in SCAN_LEDGER 
-        if scan.get("risk_score", 0) > 0 or scan.get("hits_count", 0) > 0
-    )
-    
-    if total_files_processed > 0:
-        average_risk_score = sum(scan.get("risk_score", 0.0) for scan in SCAN_LEDGER) / total_files_processed
-        average_risk_score = round(average_risk_score, 2)
-    else:
-        average_risk_score = 0.0
-        
-    recent_scans = SCAN_LEDGER[-20:][::-1]
-    
+    recent_scans = []
+    for asset in recent_assets:
+        alert = db.query(Alert).filter(Alert.asset_id == asset.id).first()
+        recent_scans.append({
+            "scan_id": asset.filename.replace("scan_", "") if asset.filename.startswith("scan_") else asset.filename,
+            "document_context": alert.matched_url if alert else "Safe Document",
+            "risk_score": asset.confidence_before or 0.0,
+            "hits_count": int(alert.match_confidence * 10) if (alert and alert.match_confidence) else 0,
+            "recommendation": "REDACT_MANDATORY" if alert else "PASS_SAFE",
+            "has_redacted_image": asset.status == "Redacted",
+            "timestamp": asset.timestamp.isoformat()
+        })
+
     return {
         "total_files_processed": total_files_processed,
         "total_threats_intercepted": total_threats_intercepted,

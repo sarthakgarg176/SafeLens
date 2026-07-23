@@ -1,0 +1,18 @@
+{
+  "trustedDomains": [
+    "incometax.gov.in",
+    "uidai.gov.in",
+    "digilocker.gov.in",
+    "onlinesbi.sbi",
+    "hdfcbank.com",
+    "icicibank.com",
+    "aadhaar.gov.in",
+    "passportindia.gov.in",
+    "epfindia.gov.in",
+    "gstn.gov.in"
+  ],
+  "trustedDomainPatterns": [
+    "*.gov.in",
+    "*.nic.in"
+  ]
+}

@@ -3,62 +3,64 @@ import { protectImagePipeline } from '../services/protectService.js';
 import { bridgeClient } from '../communication/bridgeClient.js';
 
 /**
- * Central Message Router for SafeLens Background Service Worker
- * 
- * Responsibility:
- * - Validates incoming chrome runtime messages.
- * - Routes validated messages to registered handlers based on message types.
- * - Formats and returns uniform, structured success/error responses.
- * - Handles unknown message types gracefully.
- * 
- * Interacts with:
- * - extension/src/background/serviceWorker.js (Invokes this router onMessage)
+ * Central Message Router for SafeLens Background Service Worker (Isolated Core Network Gateway)
  */
 
-/**
- * @typedef {Object} SafeLensMessage
- * @property {string} type - The action type of the message
- * @property {Object} [payload] - Optional parameters associated with the message
- */
-
-/**
- * @typedef {Object} SafeLensResponse
- * @property {boolean} success - Indicates if the operation was successful
- * @property {*} [data] - The return data of the operation on success
- * @property {string} [error] - The error message on failure
- */
-
-// Mutex lock to serialize LOG_SCAN operations and prevent storage race conditions
 let logScanLock = Promise.resolve();
 
+// Helper to convert ArrayBuffer to Base64 (Iterative to strictly prevent call stack size overflow)
+function arrayBufferToBase64(buffer) {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// Helper to convert Base64 back to ArrayBuffer safely
+function base64ToArrayBuffer(base64) {
+  if (!base64) return new ArrayBuffer(0);
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
 const handlers = {
-  /**
-   * Preprocesses intercepted image files using local OpenCV.js (WASM) inside the Service Worker.
-   * Runs OffscreenCanvas operations completely isolated from host webpage scopes.
-   */
+  PING: async () => {
+    console.log('[MessageRouter] PING message received. Sending PING response.');
+    return { ok: true };
+  },
+
+  AUTH_HANDSHAKE: async (payload) => {
+    // Handle both payload formats safely
+    const token = payload?.token || payload;
+    if (!token) {
+      throw new Error('Invalid payload: token is required for AUTH_HANDSHAKE');
+    }
+    await chrome.storage.local.set({ sessionToken: token });
+    console.log('[MessageRouter] AUTH_HANDSHAKE successful. Token stored in local storage:', token);
+    return { success: true };
+  },
+
   PREPROCESS_IMAGE: async (payload) => {
     if (!payload || !payload.arrayBuffer) {
       throw new Error('Invalid payload: arrayBuffer is required');
     }
-
-    // 1. Ensure OpenCV.js WASM compilation is ready
     await waitForOpenCV();
-
     const { arrayBuffer, type, settings } = payload;
     const blob = new Blob([arrayBuffer], { type: type || 'image/png' });
-
-    // 2. Decode file buffer to ImageBitmap using background-safe global
     const imageBitmap = await createImageBitmap(blob);
-
-    // 3. Render into an OffscreenCanvas context
     const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(imageBitmap, 0, 0);
 
-    // 4. Execute OpenCV Preprocessing Pipeline (Resize -> Gray -> Denoise -> Deskew -> Threshold)
     const preprocessedCanvas = await preprocessImage(canvas, settings);
-
-    // 5. Convert processed canvas back to ArrayBuffer
     const outputBlob = await preprocessedCanvas.convertToBlob({ type: type || 'image/png' });
     const outputBuffer = await outputBlob.arrayBuffer();
 
@@ -69,20 +71,41 @@ const handlers = {
     };
   },
 
-  /**
-   * Runs the complete local privacy protection pipeline on the file's ArrayBuffer.
-   */
   RUN_PROTECT_PIPELINE: async (payload) => {
-    if (!payload || !payload.arrayBuffer) {
-      throw new Error('Invalid payload: arrayBuffer is required');
+    if (!payload || (!payload.arrayBuffer && !payload.base64Data && !payload.storageKey)) {
+      throw new Error('Invalid payload: base64Data or arrayBuffer is required');
     }
 
-    // Ensure OpenCV.js is fully loaded and ready
+    let arrayBuffer = payload.arrayBuffer;
+    if (payload.base64Data) {
+      arrayBuffer = base64ToArrayBuffer(payload.base64Data);
+    } else if (payload.storageKey) {
+      const storageData = await chrome.storage.local.get(payload.storageKey);
+      const storedValue = storageData ? storageData[payload.storageKey] : null;
+      
+      if (typeof storedValue === 'string') {
+        arrayBuffer = base64ToArrayBuffer(storedValue);
+      } else if (storedValue && storedValue.byteLength) {
+        arrayBuffer = storedValue;
+      } else if (storedValue && typeof storedValue === 'object') {
+        arrayBuffer = storedValue;
+      }
+      
+      if (arrayBuffer && arrayBuffer.byteLength > 0) {
+        await chrome.storage.local.remove(payload.storageKey);
+      }
+    }
+
+    if (!arrayBuffer || !arrayBuffer.byteLength) {
+      throw new Error('Invalid or corrupted image arrayBuffer received in pipeline gateway');
+    }
+
+    const incomingStorageKey = 'pending_image_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    await chrome.storage.local.set({ [incomingStorageKey]: arrayBufferToBase64(arrayBuffer) });
+
+    const { name, type, settings } = payload;
     await waitForOpenCV();
 
-    const { arrayBuffer, name, type, settings } = payload;
-
-    // Build background-safe File interface mock object
     const mockFile = {
       name: name || 'upload.png',
       size: arrayBuffer.byteLength,
@@ -92,6 +115,8 @@ const handlers = {
 
     const result = await protectImagePipeline(mockFile, settings);
     
+    await chrome.storage.local.remove(incomingStorageKey);
+
     let outBuffer;
     if (result.protectedFile && typeof result.protectedFile.arrayBuffer === 'function') {
       outBuffer = await result.protectedFile.arrayBuffer();
@@ -101,7 +126,7 @@ const handlers = {
 
     return {
       success: result.success !== false,
-      arrayBuffer: outBuffer,
+      base64Data: arrayBufferToBase64(outBuffer),
       name: (result.protectedFile && result.protectedFile.name) || name,
       type: (result.protectedFile && result.protectedFile.type) || type,
       phash: result.phash || '',
@@ -113,36 +138,65 @@ const handlers = {
     };
   },
 
-  /**
-   * Toggle or set extension settings in storage.
-   */
+  REGISTER_BACKEND_ASSET: async (payload) => {
+    if (!payload || (!payload.storageKey && !payload.base64Data)) {
+      throw new Error('Invalid payload: storageKey or base64Data containing image buffer is mandatory');
+    }
+
+    let arrayBuffer = null;
+    if (payload.base64Data) {
+      arrayBuffer = base64ToArrayBuffer(payload.base64Data);
+    } else if (payload.storageKey) {
+      const storageData = await chrome.storage.local.get(payload.storageKey);
+      const storedValue = storageData ? storageData[payload.storageKey] : null;
+      
+      if (typeof storedValue === 'string') {
+        arrayBuffer = base64ToArrayBuffer(storedValue);
+      } else if (storedValue && storedValue.byteLength) {
+        arrayBuffer = storedValue;
+      }
+
+      if (arrayBuffer) {
+        await chrome.storage.local.remove(payload.storageKey);
+      }
+    }
+
+    if (!arrayBuffer || !arrayBuffer.byteLength) {
+      throw new Error('Image data not found or corrupted in background session allocation room');
+    }
+
+    const blob = new Blob([arrayBuffer], { type: payload.type || 'image/png' });
+    const file = new File([blob], payload.name || 'upload.png', { type: payload.type || 'image/png' });
+
+    console.log('[MessageRouter] Dispatching isolated proxy upload process via BridgeClient framework...');
+    
+    const result = await bridgeClient.uploadProtectedAsset(file, {
+      blur_enabled: payload.blur_enabled,
+      ai_cloak: payload.ai_cloak,
+      watermark: payload.watermark
+    });
+
+    return result;
+  },
+
   SET_SETTINGS: async (payload) => {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid settings payload');
     }
     await chrome.storage.local.set({ settings: payload });
-    
-    // Sync settings change to the backend server profile
     try {
       await bridgeClient.syncSettings(payload);
     } catch (e) {
       console.warn('[MessageRouter] Settings sync failed:', e);
     }
-    
     return { success: true };
   },
 
-  /**
-   * Retrieve active extension settings from storage.
-   */
   GET_SETTINGS: async () => {
     const data = await chrome.storage.local.get('settings');
-    return data.settings || {};
+    return data ? (data.settings || {}) : {};
   },
 
-  /**
-   * Log an intercepted upload scan result to session storage.
-   */
   LOG_SCAN: async (payload, sender) => {
     if (!payload || !payload.scanId) {
       throw new Error('Invalid scan log payload');
@@ -159,50 +213,46 @@ const handlers = {
     await nextLock;
 
     try {
-      // 1. Fetch current scans from storage
-      const { scans = [] } = await chrome.storage.local.get('scans');
-      
-      // 2. Add to log immediately so it's in storage early
+      const storageData = await chrome.storage.local.get('scans');
+      const scans = storageData && storageData.scans ? storageData.scans : [];
       const updatedScans = [payload, ...scans].slice(0, 100);
       await chrome.storage.local.set({ scans: updatedScans });
 
-      // 3. Sync metrics and dispatch alerts to bridge channels
       try {
+        const matchedUrl = sender ? (sender.url || sender.origin || 'unknown') : 'unknown';
         await bridgeClient.syncScanResult({
           metadata: { name: payload.fileName, size: payload.size, type: 'image/png' },
+          matchedUrl: matchedUrl,
           ...payload
         });
 
-        if (payload.riskLevel !== 'low' && payload.assetId) {
-          const matchedUrl = sender ? (sender.url || sender.origin || 'unknown') : 'unknown';
-          const incidentResponse = await bridgeClient.sendIncidentNotification({
-            assetId: payload.assetId,
-            matchedUrl: matchedUrl,
-            matchConfidence: payload.confidence,
-            severity: payload.riskLevel === 'critical' ? 'Serious' : 'Normal',
-            status: 'Open'
+        if (payload.riskLevel !== 'low') {
+          const generatedIncidentId = `mock_inc_${Date.now()}`;
+          payload.incidentId = generatedIncidentId;
+          const currentStorage = await chrome.storage.local.get('scans');
+          const currentScans = currentStorage && currentStorage.scans ? currentStorage.scans : [];
+          const finalScans = currentScans.map(s => {
+            if (s.scanId === payload.scanId) {
+              return { ...s, incidentId: generatedIncidentId };
+            }
+            return s;
           });
-
-          if (incidentResponse && incidentResponse.success && incidentResponse.incidentId) {
-            payload.incidentId = incidentResponse.incidentId;
-            
-            // Re-fetch current scans from storage to avoid overwriting changes from other serialized runs
-            const { scans: currentScans = [] } = await chrome.storage.local.get('scans');
-            
-            // Update the specific scan element in the array
-            const finalScans = currentScans.map(s => {
-              if (s.scanId === payload.scanId) {
-                return { ...s, incidentId: incidentResponse.incidentId };
-              }
-              return s;
-            });
-            
-            await chrome.storage.local.set({ scans: finalScans });
-            console.log('[MessageRouter] Linked local scan record with backend incident ID:', incidentResponse.incidentId);
-          }
+          await chrome.storage.local.set({ scans: finalScans });
+          console.log('[MessageRouter] Linked local scan record with mock backend incident ID:', generatedIncidentId);
         }
       } catch (e) {
         console.warn('[MessageRouter] Failed to sync scan metadata with BridgeClient:', e);
+      }
+
+      // Broadcast scan completion to all tabs (for dashboard real-time updates)
+      try {
+        chrome.tabs.query({}, (tabs) => {
+          for (const tab of tabs) {
+            chrome.tabs.sendMessage(tab.id, { type: 'SAFELENS_BROADCAST_SCAN_COMPLETED' }).catch(() => {});
+          }
+        });
+      } catch (e) {
+        console.warn('[MessageRouter] Failed to broadcast scan completion:', e);
       }
     } finally {
       release();
@@ -212,21 +262,13 @@ const handlers = {
   }
 };
 
-/**
- * Poll-awaits OpenCV WASM initialization in the background thread.
- * 
- * @returns {Promise<void>} Resolves when global cv object is loaded and parsed
- */
 async function waitForOpenCV() {
-  // If in Service Worker, delegation handles waiting, so bypass local check
   if (typeof document === 'undefined' && typeof chrome !== 'undefined' && chrome.offscreen) {
     return;
   }
-
   if (typeof cv !== 'undefined' && cv.matFromImageData) {
     return;
   }
-
   return new Promise((resolve, reject) => {
     let attempts = 0;
     const interval = setInterval(() => {
@@ -242,37 +284,25 @@ async function waitForOpenCV() {
   });
 }
 
-
-/**
- * Central router dispatcher function.
- * 
- * @param {SafeLensMessage} message - The incoming message object
- * @param {chrome.runtime.MessageSender} sender - The sender metadata object
- * @returns {Promise<SafeLensResponse>} Resolved structured response
- */
 export async function routeMessage(message, sender) {
   try {
-    // 1. Validate basic message structure
     if (!message || typeof message !== 'object') {
       return { success: false, error: 'Malformed message: Message must be an object' };
     }
-
     const { type, payload } = message;
     if (!type || typeof type !== 'string') {
       return { success: false, error: 'Malformed message: Missing type property' };
     }
 
-    console.log(`[MessageRouter] Routing message type: ${type}`, { senderId: sender.id, origin: sender.origin });
+    console.log(`[MessageRouter] Routing message type: ${type}`, { senderId: sender?.id, origin: sender?.origin });
 
-    // 2. Locate registered handler
     const handler = handlers[type];
     if (!handler) {
       console.warn(`[MessageRouter] Unknown message type: ${type}`);
       return { success: false, error: `Unknown message type: '${type}'` };
     }
 
-    // 3. Execute and format success response
-    const result = await handler(payload, sender);
+    const result = await handler(payload || message, sender);
     return { success: true, data: result };
 
   } catch (error) {

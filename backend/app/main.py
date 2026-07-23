@@ -1,16 +1,37 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+<<<<<<< HEAD
 import os
 from .database.connection import engine, Base
 from .api import health, assets, dashboard, incidents, settings, scan, protect, reports, scans
+=======
+
+from .database.connection import engine, Base
+from .api import (
+    health,
+    assets,
+    dashboard,
+    incidents,
+    settings,
+    scan,
+    protect,
+    reports,
+    scans,
+)
+>>>>>>> b8e81f6c16d96beb411457d54d19ecbca96dfba7
 
 load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SafeLens Backend", version="1.0.0")
+app = FastAPI(
+    title="SafeLens Backend",
+    version="1.0.0"
+)
 
 # Ensure storage directories exist
 os.makedirs("app/storage/uploads", exist_ok=True)
@@ -19,12 +40,16 @@ os.makedirs("app/storage/reports", exist_ok=True)
 
 app.mount("/storage", StaticFiles(directory="app/storage"), name="storage")
 
+# Deployed environment compatibility ke liye origins updated
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "*",  # Production deployment par global request routing allow karne ke liye
         "http://localhost:3000",
-        "chrome-extension://*"
+        "chrome-extension://*",
+        "https://www.remove.bg",
     ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

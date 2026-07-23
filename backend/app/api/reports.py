@@ -34,7 +34,7 @@ async def generate_report(
         "data": {
             "report_id": report_id,
             "report_type": action.action_type if action else "General",
-            "download_url": f"http://localhost:8000/storage/reports/report_{report_id}.pdf",
+            "download_url": f"https://safelens-zttx.onrender.com/storage/reports/report_{report_id}.pdf",
             "generated_at": datetime.now(timezone.utc).isoformat()
         },
         "timestamp": datetime.now(timezone.utc).isoformat()

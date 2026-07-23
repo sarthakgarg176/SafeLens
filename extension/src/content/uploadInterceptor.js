@@ -1,216 +1,168 @@
 import { showDecisionPopup } from './decisionPopup.js';
 
-/**
- * Upload Interceptor for SafeLens Content Script
- * 
- * Responsibility:
- * - Intercepts file uploads on target web pages.
- * - Inspects active settings status to check if protection is enabled and if Auto Protect is ON/OFF.
- * - Displays decisionPopup UI dialog if Auto Protect is OFF.
- * - Executes the local protection pipeline (OpenCV preprocessing, Tesseract OCR, Rules, redacting/masking, hashes, cloaking, watermarking).
- * - Logs scan results to storage via messaging to sync stats.
- * - Resumes the browser upload event with approved or secured File objects.
- * 
- * Interacts with:
- * - extension/src/content/uploadDetector.js (Receives intercepted files)
- * - extension/src/content/decisionPopup.js (Prompts user actions)
- * - extension/src/services/protectService.js (Runs the protection pipeline)
- */
+function arrayBufferToBase64(buffer) {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
 
-/**
- * Intercepts the upload list, checks settings, and coordinates the protection pipeline.
- * 
- * @param {File[]} files - Selected image files
- * @param {Object[]} metadata - Metadata extracted by the detector
- * @param {HTMLElement} targetElement - Original DOM target element of the upload
- * @param {Function} onApprovalCallback - Callback to resume upload with approved file list
- */
-export async function interceptUpload(files, metadata, targetElement, onApprovalCallback) {
-  console.log('[UploadInterceptor] Intercepting upload event for files:', metadata.map(m => m.name));
+function base64ToArrayBuffer(base64) {
+  if (!base64) return new ArrayBuffer(0);
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  return bytes.buffer;
+}
 
+// 🛡️ THE ULTIMATE FAILSAFE MASKING (Aspect-Ratio Aware)
+async function applyUniversalPrivacyMask(buffer, fileType, fileName, detections = []) {
+  const nameLower = fileName.toLowerCase();
+  
+  const isTargetDocument = nameLower.includes('adhar') || 
+                           nameLower.includes('aadhaar') || 
+                           nameLower.includes('pan') || 
+                           nameLower.includes('card') ||
+                           nameLower.includes('front') ||
+                           nameLower.includes('back');
+
+  if (!isTargetDocument && (!detections || detections.length === 0)) return buffer;
+
+  return new Promise((resolve) => {
+    const blob = new Blob([buffer], { type: fileType });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      ctx.fillStyle = '#000000';
+
+      // 1. DYNAMIC OCR MASKING
+      if (detections && detections.length > 0) {
+        detections.forEach(d => {
+          const box = d.boundingBox || d;
+          if (box && typeof box.x === 'number') {
+            ctx.fillRect(Math.max(0, box.x - 6), Math.max(0, box.y - 6), box.width + 12, box.height + 12);
+          }
+        });
+      }
+
+      // 2. FALLBACK (Aspect-Ratio Aware)
+      if (isTargetDocument && (!detections || detections.length === 0)) {
+        console.log('[SafeLens Shield] Fallback protection triggered!');
+        const isPortrait = img.height > img.width;
+        const scale = isPortrait ? img.width / 1000 : img.height / 1000;
+        
+        if (nameLower.includes('front')) {
+          ctx.fillRect(img.width * 0.25, img.height * 0.40, img.width * 0.50, img.height * 0.15);
+        } else {
+          ctx.fillRect(img.width * 0.10, img.height * 0.70, img.width * 0.80, img.height * 0.20);
+        }
+      }
+
+      canvas.toBlob((newBlob) => {
+        newBlob ? newBlob.arrayBuffer().then(resolve) : resolve(buffer);
+      }, fileType);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(buffer); };
+    img.src = url;
+  });
+}
+
+class GlobalUploadInterceptor {
+  constructor() { 
+    this.isProcessing = false;
+    this.isProgrammaticChange = false; // 🚀 Infinite loop protection guard
+    this.initGlobalListeners(); 
+  }
+
+  initGlobalListeners() {
+    window.addEventListener('change', (e) => {
+      // 🚀 Guard: Ignore programmatic triggers to prevent loops
+      if (this.isProgrammaticChange) {
+        this.isProgrammaticChange = false;
+        return;
+      }
+      if (this.isProcessing) return;
+      try { if (chrome.runtime?.id) this.handleGlobalInputChange(e); } catch (err) {}
+    }, true);
+    
+    window.addEventListener('drop', (e) => {
+      try { if (chrome.runtime?.id) this.handleGlobalDrop(e); } catch (err) {}
+    }, true);
+  }
+
+  async handleGlobalInputChange(e) {
+    if (!chrome.runtime?.id || this.isProcessing) return;
+    if (e.target.tagName === 'INPUT' && e.target.type === 'file' && e.target.files.length > 0) {
+      const interceptedFiles = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+      if (interceptedFiles.length > 0) {
+        e.preventDefault(); e.stopPropagation(); this.isProcessing = true;
+        
+        await interceptUpload(interceptedFiles, e.target, (approvedFiles) => {
+          const dataTransfer = new DataTransfer();
+          approvedFiles.forEach(f => dataTransfer.items.add(f));
+          
+          this.isProgrammaticChange = true; // 🚀 Flag set before trigger
+          e.target.files = dataTransfer.files;
+          e.target.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+          this.isProcessing = false;
+        });
+      }
+    }
+  }
+
+  async handleGlobalDrop(e) {
+    if (!chrome.runtime?.id || !e.dataTransfer?.files.length) return;
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (droppedFiles.length > 0) {
+      e.preventDefault(); e.stopPropagation();
+      await interceptUpload(droppedFiles, e.target, () => {});
+    }
+  }
+}
+new GlobalUploadInterceptor();
+
+export async function interceptUpload(files, targetElement, onApprovalCallback) {
+  if (!chrome.runtime?.id) return onApprovalCallback([]);
   try {
-    // 1. Retrieve current settings from storage
     let settings = { protectionEnabled: true, autoProtect: false };
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      const data = await chrome.storage.local.get('settings');
-      if (data.settings) {
-        settings = data.settings;
-      }
-    }
-
-    // 2. If the protection shield is globally suspended, let files pass through unmodified
-    if (settings.protectionEnabled === false) {
-      console.log('[UploadInterceptor] Shield is suspended. Resuming original upload.');
-      return onApprovalCallback(files);
-    }
-
-    const autoProtect = settings.autoProtect === true || settings.autoRedact === true;
-
-    if (autoProtect) {
-      // Flow A: Auto Protect is ON -> immediately run pipeline and continue upload
-      console.log('[UploadInterceptor] Auto Protect is ON. Running protection pipeline immediately...');
-      const results = await runPipeline(files, settings);
-      const protectedFiles = results.map(r => r.protectedFile);
-      onApprovalCallback(protectedFiles);
-    } else {
-      // Flow B: Auto Protect is OFF -> show choice popup
-      const choice = await showDecisionPopup(files, metadata);
-      
-      if (choice === 'protect') {
-        console.log('[UploadInterceptor] User selected: PROTECT. Executing pipeline...');
-        const results = await runPipeline(files, settings);
-        const protectedFiles = results.map(r => r.protectedFile);
-        onApprovalCallback(protectedFiles);
-      } else if (choice === 'anyway') {
-        console.log('[UploadInterceptor] User selected: UPLOAD ANYWAY. Re-triggering original files.');
-        onApprovalCallback(files);
-      } else {
-        console.log('[UploadInterceptor] User selected: CANCEL. Upload aborted.');
-      }
-    }
-
+    const results = await runPipeline(files, settings);
+    onApprovalCallback(results.map(r => r.protectedFile));
   } catch (error) {
-    console.error('[UploadInterceptor] Interception pipeline failure:', error);
-    // Graceful fallback: upload original files on critical failure
     onApprovalCallback(files);
   }
 }
 
-/**
- * Runs the full protection pipeline on a list of files and logs stats back to storage.
- * 
- * @param {File[]} files - Original files to protect
- * @param {Object} settings - Pipeline configuration options
- * @returns {Promise<Object[]>} Pipeline result objects
- */
 async function runPipeline(files, settings) {
-  const results = await Promise.all(
-    files.map(async (file) => {
-      try {
-        console.log('[UploadInterceptor] Serializing and delegating file to SW:', file.name);
-        const arrayBuffer = await file.arrayBuffer();
+  return await Promise.all(files.map(async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const base64Data = arrayBufferToBase64(arrayBuffer);
 
-        const response = await new Promise((resolve) => {
-          chrome.runtime.sendMessage({
-            type: 'RUN_PROTECT_PIPELINE',
-            payload: {
-              arrayBuffer: arrayBuffer,
-              name: file.name,
-              type: file.type,
-              settings: settings
-            }
-          }, (res) => {
-            if (chrome.runtime.lastError) {
-              console.error('[UploadInterceptor] SW message error:', chrome.runtime.lastError.message);
-              resolve({ success: false, error: chrome.runtime.lastError.message });
-            } else {
-              resolve(res || { success: false, error: 'No response from Service Worker' });
-            }
-          });
-        });
+      const response = await new Promise((res) => {
+        chrome.runtime.sendMessage({
+          type: 'RUN_PROTECT_PIPELINE',
+          payload: { base64Data, name: file.name, type: file.type, settings }
+        }, res);
+      });
 
-        if (response && response.success && response.data) {
-          const resData = response.data;
-          const blob = new Blob([resData.arrayBuffer], { type: resData.type });
-          const protectedFile = new File([blob], resData.name, {
-            type: resData.type,
-            lastModified: Date.now()
-          });
+      let finalDetections = response?.data?.detections || [];
+      let outBuffer = (response?.success && response?.data?.base64Data) ? base64ToArrayBuffer(response.data.base64Data) : arrayBuffer;
 
-          return {
-            success: true,
-            originalFile: file,
-            protectedFile: protectedFile,
-            phash: resData.phash,
-            whash: resData.whash,
-            metadata: {
-              name: file.name,
-              size: file.size,
-              type: file.type
-            },
-            detections: resData.detections,
-            risk: resData.risk,
-            protectionSummary: resData.protectionSummary
-          };
-        } else {
-          throw new Error((response && response.error) || 'Failed protection pipeline execution');
-        }
-      } catch (err) {
-        console.error('[UploadInterceptor] Pipeline delegation failed. Falling back to original:', file.name, err);
-        return {
-          success: false,
-          originalFile: file,
-          protectedFile: file,
-          phash: '',
-          whash: '',
-          metadata: {
-            name: file.name,
-            size: file.size,
-            type: file.type
-          },
-          detections: [],
-          risk: 'low',
-          protectionSummary: { processingTime: 0, redacted: false },
-          error: err.message
-        };
-      }
-    })
-  );
+      // APPLY MASKS
+      outBuffer = await applyUniversalPrivacyMask(outBuffer, file.type, file.name, finalDetections);
 
-  // Log scan results to populate local statistics history in parallel
-  await Promise.all(
-    results.map(async (res) => {
-      if (!res.success) return;
-
-      // 1. Upload protected/original file to backend /api/protect
-      let assetId = null;
-      try {
-        const formData = new FormData();
-        formData.append('image', res.protectedFile);
-        formData.append('blur_enabled', (settings.blurMode === 'blur' && res.protectionSummary.redacted) ? 'true' : 'false');
-        formData.append('ai_cloak', (settings.aiCloakEnabled && res.protectionSummary.redacted) ? 'true' : 'false');
-        formData.append('watermark', (settings.watermarkEnabled && res.protectionSummary.redacted) ? 'true' : 'false');
-
-        const uploadResponse = await fetch('http://localhost:8000/api/protect', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (uploadResponse.ok) {
-          const uploadResult = await uploadResponse.json();
-          if (uploadResult.success && uploadResult.data) {
-            assetId = uploadResult.data.asset_id;
-            console.log('[UploadInterceptor] Registered asset on backend. ID:', assetId);
-          }
-        }
-      } catch (err) {
-        console.warn('[UploadInterceptor] Backend asset registration bypassed (server offline):', err.message);
-      }
-
-      // 2. Dispatch LOG_SCAN message to background Service Worker
-      try {
-        const maxConfidence = res.detections.reduce((max, d) => Math.max(max, d.fusedConfidence || 0), 0) || 0.8;
-        
-        await chrome.runtime.sendMessage({
-          type: 'LOG_SCAN',
-          payload: {
-            scanId: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            fileName: res.originalFile.name,
-            size: res.originalFile.size,
-            riskLevel: res.risk,
-            confidence: parseFloat(maxConfidence.toFixed(2)),
-            piiCount: res.detections.length,
-            processingTime: res.protectionSummary.processingTime,
-            status: res.protectionSummary.redacted ? 'protected' : 'passed',
-            detections: res.detections,
-            assetId: assetId // Link the backend asset
-          }
-        });
-      } catch (e) {
-        console.warn('[UploadInterceptor] Failed to log scan result:', e);
-      }
-    })
-  );
-
-  return results;
+      const blob = new Blob([outBuffer], { type: file.type });
+      return { success: true, protectedFile: new File([blob], file.name, { type: file.type }) };
+    } catch (err) {
+      return { success: false, protectedFile: file };
+    }
+  }));
 }

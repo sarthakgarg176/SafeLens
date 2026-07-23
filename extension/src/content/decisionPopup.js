@@ -45,6 +45,12 @@ export function showDecisionPopup(files, metadata) {
       return resolve('cancel');
     }
 
+    if (!(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id)) {
+      console.warn('[DecisionPopup] Extension context isolated. Bypassing popup rendering.');
+      alert("SafeLens Privacy Shield Alert: The extension background service is currently disconnected or updating. Outbound uploads have been securely blocked to prevent potential leaking of sensitive data. Please refresh the page to restart protection.");
+      return resolve('cancel');
+    }
+
     // 2. Create overlay container
     const overlay = document.createElement('div');
     overlay.id = 'safelens-intercept-modal';
@@ -244,6 +250,12 @@ export function showDecisionPopup(files, metadata) {
     const btnCancel = document.getElementById('sl-btn-cancel');
 
     const handleSelect = (choice) => {
+      if (!(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id)) {
+        console.warn('[DecisionPopup] Extension context isolated during user interaction. Falling back safely.');
+        cleanup();
+        alert("SafeLens Privacy Shield Alert: The extension background service is currently disconnected or updating. Outbound uploads have been securely blocked to prevent potential leaking of sensitive data. Please refresh the page to restart protection.");
+        return resolve('cancel');
+      }
       cleanup();
       resolve(choice);
     };

@@ -78,7 +78,7 @@ function Toggle({ enabled, onToggle, label }) {
 /* ─── Fake API tokens (static – no need to share globally) ─────────────────── */
 const mockTokens = [
   { id: 'tok_1', label: 'Production API Key', value: 'sk-prod-7x2qNbHtWm4LpK9RcEoJzXvYf3sAiDuG' },
-  { id: 'tok_2', label: 'Webhook Secret', value: 'whsec_aK2jP8mNqXdRv7tBcZfG0sLhYeWiOuE1' },
+  { id: 'tok_2', label: 'Webhook Secret', value: import.meta.env.VITE_STRIPE_WEBHOOK_SECRET || '' },
 ];
 
 
