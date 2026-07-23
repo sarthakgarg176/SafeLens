@@ -1,6 +1,6 @@
 /**
- * interceptor.js (Tri-Layer Smart PII Redaction)
- * FIX: Backend Fallbacks, Geometry Heuristics & Bulletproof Error Handling.
+ * interceptor.js (Tri-Layer Smart PII Redaction - Synced with Backend V2)
+ * Handles client-side file swapping and syncs with FastAPI /api/v2/process-upload endpoint.
  */
 
 (function () {
@@ -112,11 +112,13 @@
       async (response) => {
         let isPiiDetected = false;
 
-        // LAYER 1: BACKEND CHECK (Fail-safe against API errors)
+        // LAYER 1: BACKEND V2 CHECK (Synced with new process_upload.py response)
         if (chrome.runtime.lastError) {
             console.warn(`[${EXT_NAME}] Backend unreachable. Falling back to Client-Side Heuristics...`);
         } else if (response) {
-           if (response.pii_found === true || response.decoy_applied === true || response.status === 'DECOYED') isPiiDetected = true;
+           if (response.redaction_applied === true || response.decoy_applied === true || response.status === 'DECOYED' || response.pii_found === true) {
+               isPiiDetected = true;
+           }
            if (response.extractedText && containsPIIText(response.extractedText)) isPiiDetected = true;
            if (response.pii_boxes && response.pii_boxes.length > 0) isPiiDetected = true;
         }
@@ -191,7 +193,7 @@
         if (chrome.runtime.lastError) return;
         
         const isSuccess = response && (
-          response.status === 'success' || response.status === 'SUCCESS' || response.status === 'DECOYED' || response.decoy_applied !== undefined
+          response.status === 'success' || response.status === 'SUCCESS' || response.status === 'DECOYED' || response.decoy_applied !== undefined || response.success === true
         );
 
         window.dispatchEvent(new CustomEvent('safelens:notify', {

@@ -17,6 +17,7 @@ from api import (
     reports,
     scans,
     websocket,
+    process_upload,
 )
 
 load_dotenv()
@@ -71,3 +72,4 @@ app.include_router(protect.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(scans.router, prefix="/api")
 app.include_router(websocket.router, prefix="/api")
+app.include_router(process_upload.router, prefix="/api")
