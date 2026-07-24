@@ -1,0 +1,112 @@
+/* ==========================================================================
+   SafeLens 2.0 - Security / Risk Telemetry Color Tokens
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Success: Neon Green (#00FFCC)
+   Used for: Decoys successfully deployed, clean scans, safe actions
+   -------------------------------------------------------------------------- */
+.status-success {
+  color: var(--color-success);
+  text-shadow: 0 0 8px rgba(var(--color-success-raw), 0.3);
+}
+
+.bg-status-success {
+  background-color: rgba(var(--color-success-raw), 0.08);
+  border: 1px solid rgba(var(--color-success-raw), 0.2);
+}
+
+.border-status-success {
+  border-color: var(--color-success);
+}
+
+.glow-status-success {
+  box-shadow: 0 0 15px 0 rgba(var(--color-success-raw), var(--border-glow-opacity));
+}
+
+.glass-card-success-hover:hover {
+  border-color: rgba(var(--color-success-raw), 0.4);
+  box-shadow: 
+    0 12px 40px 0 rgba(0, 0, 0, 0.5),
+    0 0 25px 0 rgba(var(--color-success-raw), 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Warning: Amber/Yellow (#FF9900)
+   Used for: Whitelisted domains, bypasses, non-critical policy warnings
+   -------------------------------------------------------------------------- */
+.status-warning {
+  color: var(--color-warning);
+  text-shadow: 0 0 8px rgba(var(--color-warning-raw), 0.3);
+}
+
+.bg-status-warning {
+  background-color: rgba(var(--color-warning-raw), 0.08);
+  border: 1px solid rgba(var(--color-warning-raw), 0.2);
+}
+
+.border-status-warning {
+  border-color: var(--color-warning);
+}
+
+.glow-status-warning {
+  box-shadow: 0 0 15px 0 rgba(var(--color-warning-raw), var(--border-glow-opacity));
+}
+
+.glass-card-warning-hover:hover {
+  border-color: rgba(var(--color-warning-raw), 0.4);
+  box-shadow: 
+    0 12px 40px 0 rgba(0, 0, 0, 0.5),
+    0 0 25px 0 rgba(var(--color-warning-raw), 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Danger / Critical Alert: Crimson Red (#FF3333)
+   Used for: Interception failures, leaks, credentials spoofed, hacking hazard
+   -------------------------------------------------------------------------- */
+.status-danger {
+  color: var(--color-danger);
+  text-shadow: 0 0 8px rgba(var(--color-danger-raw), 0.3);
+}
+
+.bg-status-danger {
+  background-color: rgba(var(--color-danger-raw), 0.08);
+  border: 1px solid rgba(var(--color-danger-raw), 0.2);
+}
+
+.border-status-danger {
+  border-color: var(--color-danger);
+}
+
+.glow-status-danger {
+  box-shadow: 0 0 15px 0 rgba(var(--color-danger-raw), var(--border-glow-opacity));
+}
+
+.glass-card-danger-hover:hover {
+  border-color: rgba(var(--color-danger-raw), 0.4);
+  box-shadow: 
+    0 12px 40px 0 rgba(0, 0, 0, 0.5),
+    0 0 25px 0 rgba(var(--color-danger-raw), 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Info / Neutral Scanning: Cyber Blue (#00E5FF)
+   Used for: General events, active scanning status, background updates
+   -------------------------------------------------------------------------- */
+.status-info {
+  color: var(--color-info);
+  text-shadow: 0 0 8px rgba(var(--color-info-raw), 0.3);
+}
+
+.bg-status-info {
+  background-color: rgba(var(--color-info-raw), 0.08);
+  border: 1px solid rgba(var(--color-info-raw), 0.2);
+}
+
+.border-status-info {
+  border-color: var(--color-info);
+}
+
+.glow-status-info {
+  box-shadow: 0 0 15px 0 rgba(var(--color-info-raw), var(--border-glow-opacity));
+}
