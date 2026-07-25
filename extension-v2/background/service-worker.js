@@ -25,18 +25,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       if (message.action === 'PROCESS_UPLOAD') {
         const { fileDataUrl, extractedText, targetUrl } = message.payload;
+        const targetDomain = targetUrl
+          ? (targetUrl.startsWith('http') ? new URL(targetUrl).hostname : targetUrl)
+          : (sender.tab && sender.tab.url ? new URL(sender.tab.url).hostname : 'unknown_domain');
+
         if (settings.USE_NEW_AGENT) {
-          console.log('[ServiceWorker] Routing upload to new agentic backend...');
-          const targetDomain = targetUrl ? (targetUrl.startsWith('http') ? new URL(targetUrl).hostname : targetUrl) : (sender.tab && sender.tab.url ? new URL(sender.tab.url).hostname : "unknown_domain");
+          // 🔵 [DIAGNOSTIC] Confirm routing to correct endpoint
+          console.log('[ServiceWorker] [DEBUG] PROCESS_UPLOAD received. Routing to /api/v2/process-upload...');
+          console.log('[ServiceWorker] [DEBUG] targetDomain:', targetDomain);
+          console.log('[ServiceWorker] [DEBUG] fileDataUrl present:', !!fileDataUrl, '| extractedText present:', !!extractedText);
+
+          // ✅ FIX: Route to /api/v2/process-upload with the FULL image payload
           result = await sendToBackend(
             settings.backendApiBaseUrl,
-            '/api/protect',
-            { 
+            '/api/v2/process-upload',
+            {
+              fileDataUrl: fileDataUrl || null,
+              extracted_text: extractedText || null,
               target_domain: targetDomain,
-              text: extractedText || fileDataUrl || "",
-              pii_type: "file_upload"
+              pii_type: 'file_upload'
             }
           );
+
+          console.log('[ServiceWorker] [DEBUG] /api/v2/process-upload response:', result);
         } else {
           console.log('[ServiceWorker] USE_NEW_AGENT is false - using legacy rules engine.');
           result = runLegacyRules(extractedText || '');
@@ -46,17 +57,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const formPayload = message.payload;
         console.log('[ServiceWorker] Routing text form to backend...');
         
-        // Extract domain from the sender tab URL
         const targetDomain = sender.tab && sender.tab.url ? new URL(sender.tab.url).hostname : "unknown_domain";
+        const textToProtect = typeof formPayload === 'string'
+          ? formPayload
+          : (formPayload && typeof formPayload === 'object' && formPayload.text ? formPayload.text : JSON.stringify(formPayload));
         
-        // Route directly to the backend's /api/protect endpoint
-        // Format the payload to match FastAPI's ProtectRequest model
         result = await sendToBackend(
           settings.backendApiBaseUrl,
           '/api/protect',
           { 
               target_domain: targetDomain,
-              text: JSON.stringify(formPayload),
+              text: textToProtect,
               pii_type: "form_data"
           }
         );

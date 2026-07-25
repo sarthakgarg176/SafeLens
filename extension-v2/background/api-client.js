@@ -5,8 +5,11 @@
  */
 
 export async function sendToBackend(baseUrl, endpoint, payload) {
-  // Ensure trailing slash isn't doubled
-  const cleanBase = baseUrl.replace(/\/+$/, '');
+  const effectiveBaseUrl = (baseUrl && typeof baseUrl === 'string' && baseUrl.trim())
+    ? baseUrl.trim()
+    : 'http://127.0.0.1:8000';
+
+  const cleanBase = effectiveBaseUrl.replace(/\/+$/, '');
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const fullUrl = `${cleanBase}${cleanEndpoint}`;
 
@@ -27,7 +30,7 @@ export async function sendToBackend(baseUrl, endpoint, payload) {
     
     // Detailed error feedback for extension developers
     let friendlyMessage = err.message;
-    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+    if (err.name === 'TypeError' && (err.message.includes('fetch') || err.message.includes('NetworkError') || err.message.includes('Failed'))) {
       friendlyMessage = `Cannot connect to server at ${fullUrl}. Check if FastAPI server is running.`;
     }
 

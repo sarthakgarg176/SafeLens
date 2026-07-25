@@ -12,3 +12,4 @@ python-dotenv==1.0.1
 aiofiles==24.1.0
 langgraph
 langchain-core
+gliner>=0.1.0

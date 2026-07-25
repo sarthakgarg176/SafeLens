@@ -3,26 +3,36 @@
   "name": "SafeLens Privacy Shield AI",
   "version": "2.0.0",
   "description": "Enterprise security extension for Privacy Shield AI - Zero-click context-aware routing and synthetic decoy protection.",
-
   "permissions": [
     "webRequest",
     "declarativeNetRequest",
     "storage",
     "activeTab"
   ],
-
   "host_permissions": [
     "<all_urls>"
   ],
-
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://gemini.google.com/*",
+        "*://*.gemini.google.com/*"
+      ],
+      "js": [
+        "content-scripts/fetch-interceptor.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
       "js": [
         "content-scripts/domain-checker.js",
         "content-scripts/interceptor.js",
@@ -32,10 +42,11 @@
         "styles/toast.css",
         "styles/overlay.css"
       ],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
     }
   ],
-
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
@@ -44,18 +55,21 @@
       "128": "assets/icons/shield-protected.svg"
     }
   },
-
   "icons": {
     "16": "assets/icons/shield-protected.svg",
     "48": "assets/icons/shield-protected.svg",
     "128": "assets/icons/shield-protected.svg"
   },
-
- 
   "web_accessible_resources": [
-  {
-    "resources": ["assets/icons/*.svg", "config/*.json", "styles/*.css"],
-    "matches": ["<all_urls>"]
-  }
-]
+    {
+      "resources": [
+        "assets/icons/*.svg",
+        "config/*.json",
+        "styles/*.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }

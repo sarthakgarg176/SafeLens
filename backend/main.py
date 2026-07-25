@@ -41,12 +41,8 @@ app.mount("/storage", StaticFiles(directory=str(BASE_DIR / "storage")), name="st
 # Deployed environment compatibility ke liye origins updated
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*",  # Production deployment par global request routing allow karne ke liye
-        "http://localhost:3000",
-        "chrome-extension://*",
-        "https://www.remove.bg",
-    ],
+    allow_origins=["*"],
+    allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

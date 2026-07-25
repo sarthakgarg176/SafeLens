@@ -1,6 +1,6 @@
 from typing import TypedDict, Optional, List, Dict, Any
 
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     """
     Represents the execution state of the SafeLens LangGraph pipeline.
     """
@@ -8,6 +8,8 @@ class AgentState(TypedDict):
     request_id: str
     file_name: str
     target_domain: str
+    raw_text: Optional[str]
+    input_data: Optional[Dict[str, Any]]
     
     # 2. Extracted Data
     extracted_text: Optional[str]
