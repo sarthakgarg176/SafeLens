@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from pathlib import Path
 from database.connection import engine, Base
+
+# Import all existing routers + the NEW image_redactor router
 from api import (
     health,
     assets,
@@ -18,6 +20,7 @@ from api import (
     scans,
     websocket,
     process_upload,
+    image_redactor  # 🚀 NEW: Standalone OCR + LLM Redaction Router
 )
 
 load_dotenv()
@@ -35,6 +38,7 @@ BASE_DIR = Path(__file__).resolve().parent
 os.makedirs(BASE_DIR / "storage/uploads", exist_ok=True)
 os.makedirs(BASE_DIR / "storage/thumbnails", exist_ok=True)
 os.makedirs(BASE_DIR / "storage/reports", exist_ok=True)
+os.makedirs(BASE_DIR / "storage/redacted", exist_ok=True) # 🚀 NEW: Directory for safe, masked output images
 
 app.mount("/storage", StaticFiles(directory=str(BASE_DIR / "storage")), name="storage")
 
@@ -58,6 +62,7 @@ def root():
         "health": "/api/health"
     }
 
+# Include all routers
 app.include_router(health.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
@@ -69,3 +74,6 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(scans.router, prefix="/api")
 app.include_router(websocket.router, prefix="/api")
 app.include_router(process_upload.router, prefix="/api")
+
+# 🚀 NEW: Mount the Enterprise DLP Image Redaction route
+app.include_router(image_redactor.router, prefix="/api")

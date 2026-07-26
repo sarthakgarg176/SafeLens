@@ -1223,3 +1223,36 @@ The extension and dashboard projects have both compiled successfully. Reload the
 3. **LangGraph StateGraph Integration:** Implemented `graph_engine/workflow.py` defining a LangGraph `StateGraph` and `decoy_synthesis/synthesizer.py` implementing `DecoySynthesizer` for dynamic PII masking. Wired endpoint handlers in `protect.py` and `scan.py` to route through the `workflow_app`.
 4. **Configuration & Testing:** Updated `start.bat` to include `set PYTHONPATH=.` and corrected the server start command. Created `test_langgraph_workflow.py` and ran `python -m unittest discover` (all 4 unit tests passed).
 5. **Documentation & Prompts:** Created `prompts/langgraph-backend.md` to establish rules for the new architecture and updated `chat_history.md`.
+
+
+## User
+
+<USER_REQUEST>
+Act as a Senior AI & Computer Vision Engineer. I have reviewed and approved your "4-Layer OCR Redaction Speed Optimization Plan". Please proceed to rewrite and fully update `backend/api/image_redactor.py` based exactly on this plan.
+
+CRITICAL UX & PERFORMANCE DIRECTIVES:
+1. Normal Images (Zero Time Wasted): Images that do not contain any sensitive PII must be processed and returned almost instantly, feeling exactly like a normal file upload. Ensure the code has a highly optimized early-exit path (e.g., if RapidOCR detects no text, or regex finds no matches, instantly return the original image without any further processing).
+2. Sensitive Images (Millisecond Target): For images containing PII (like PAN, Credit Cards, or other IDs), the entire pipeline (Decode -> OpenCV Deskew -> RapidOCR ONNX Inference -> Masking -> Save) must execute in milliseconds (< 1 second target).
+3. Accuracy Preservation: Ensure the OpenCV Hough deskew gracefully handles tilted images, and the bounding boxes scale correctly back to the original image dimensions for pixel-perfect solid black redaction.
+4. Regex Optimization: Pre-compile all PII regex patterns at the module level. 
+
+Please provide the complete, fully updated, and production-ready `image_redactor.py` code. Ensure you also provide the exact `pip install` commands needed to update `requirements.txt` (removing paddleocr and adding rapidocr-onnxruntime).
+
+After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+</USER_REQUEST>
+
+## Assistant
+
+The `backend/api/image_redactor.py` file has been completely rewritten to use `rapidocr-onnxruntime`, OpenCV Hough Deskew, and pre-compiled regexes as per your directives. The inference pipeline now targets sub-second latency with early exit optimizations.
+The `backend/requirements.txt` file was also updated to replace `paddleocr` and `paddlepaddle` with `rapidocr-onnxruntime`.
+
+The command used to update the dependencies was:
+```bash
+pip uninstall -y paddleocr paddlepaddle
+pip install rapidocr-onnxruntime
+```

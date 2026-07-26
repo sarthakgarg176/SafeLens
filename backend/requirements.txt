@@ -13,3 +13,6 @@ aiofiles==24.1.0
 langgraph
 langchain-core
 gliner>=0.1.0
+opencv-python
+rapidocr-onnxruntime
+zxing-cpp
