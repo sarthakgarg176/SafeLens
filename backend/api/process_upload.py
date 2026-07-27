@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import cv2
-from api.image_redactor import extract_barcode_boxes
+from api.image_redactor import extract_barcode_boxes, extract_signature_boxes
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -52,28 +52,57 @@ def apply_backend_redaction_and_watermark(img: Image.Image) -> str:
     draw.rectangle([x_start, y1, x_start + box_w, y1 + box_h], fill=(0, 0, 0, 255))
     draw.rectangle([x_start, y2, x_start + box_w, y2 + box_h], fill=(0, 0, 0, 255))
 
-    # 1.5. Detect and redact Barcodes/QR Codes intelligently
+    # Convert to OpenCV format once for vision models
     try:
         cv_img = cv2.cvtColor(np.array(img.convert('RGB')), cv2.COLOR_RGB2BGR)
-        print("[PROCESS_UPLOAD] 🔍 Scanning image for Barcodes/QR codes...")
-        barcode_boxes = extract_barcode_boxes(cv_img)
-        print(f"[PROCESS_UPLOAD] 📊 Barcode Scan Complete -> Found {len(barcode_boxes)} Barcode/QR region(s).")
-        for box in barcode_boxes:
-            x_min, y_min, x_max, y_max = box["coords"]
-            padding = 10
-            draw.rectangle(
-                [
-                    max(0, x_min - padding),
-                    max(0, y_min - padding),
-                    min(width, x_max + padding),
-                    min(height, y_max + padding)
-                ],
-                fill=(0, 0, 0, 255)
-            )
-        if barcode_boxes:
-            print(f"[PROCESS_UPLOAD] ✍️ Masked {len(barcode_boxes)} Barcode/QR code region(s) with solid black boxes.")
     except Exception as e:
-        print(f"[PROCESS_UPLOAD] ❌ Barcode redaction failed: {e}")
+        print(f"[PROCESS_UPLOAD] ❌ OpenCV conversion failed: {e}")
+        cv_img = None
+
+    if cv_img is not None:
+        # 1.5. Detect and redact Barcodes/QR Codes intelligently
+        try:
+            print("[PROCESS_UPLOAD] 🔍 Scanning image for Barcodes/QR codes...")
+            barcode_boxes = extract_barcode_boxes(cv_img)
+            print(f"[PROCESS_UPLOAD] 📊 Barcode Scan Complete -> Found {len(barcode_boxes)} Barcode/QR region(s).")
+            for box in barcode_boxes:
+                x_min, y_min, x_max, y_max = box["coords"]
+                padding = 10
+                draw.rectangle(
+                    [
+                        max(0, x_min - padding),
+                        max(0, y_min - padding),
+                        min(width, x_max + padding),
+                        min(height, y_max + padding)
+                    ],
+                    fill=(0, 0, 0, 255)
+                )
+            if barcode_boxes:
+                print(f"[PROCESS_UPLOAD] ✍️ Masked {len(barcode_boxes)} Barcode/QR code region(s) with solid black boxes.")
+        except Exception as e:
+            print(f"[PROCESS_UPLOAD] ❌ Barcode redaction failed: {e}")
+
+        # ✅ FIX 2: Added Signature Detection Block
+        # 1.6 Detect and redact Signatures
+        try:
+            print("[PROCESS_UPLOAD] 🖋️ Scanning image for Signatures...")
+            signature_boxes = extract_signature_boxes(cv_img)
+            print(f"[PROCESS_UPLOAD] 📊 Signature Scan Complete -> Found {len(signature_boxes)} Signature(s).")
+            
+            for box in signature_boxes:
+                x_min, y_min, x_max, y_max = box["coords"]
+                padding = 10
+                draw.rectangle(
+                    [
+                        max(0, x_min - padding),
+                        max(0, y_min - padding),
+                        min(width, x_max + padding),
+                        min(height, y_max + padding)
+                    ],
+                    fill=(0, 0, 0, 255) # Solid black box
+                )
+        except Exception as e:
+            print(f"[PROCESS_UPLOAD] ❌ Signature redaction failed: {e}")
 
     # 2. Add diagonal SAFELENS watermark overlay
     watermark_text = "SAFELENS DECOY - PII PROTECTED"

@@ -105,7 +105,11 @@
       API_KEY: /(?:key|token|secret|api[_\-]?key|aws[_\-]?access[_\-]?key[_\-]?id|aws[_\-]?secret[_\-]?access[_\-]?key)\s*[:=]\s*["']?[A-Za-z0-9\-_/+=]{16,}["']?|(?:pk|sk)_(?:test|live)_[0-9a-zA-Z]{24,}|(?:AKIA|ASIA)[0-9A-Z]{16}/gi,
       JWT: /eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/g,
       PRIVATE_KEY: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+)?PRIVATE\s+KEY-----/gi,
-      PASSWORD_SECRET: /(?:password|passcode|pwd|secret)\s*[:=]\s*["']?([^\s"']{3,})["']?/gi
+      PASSWORD_SECRET: /(?:password|passcode|pwd|secret)\s*[:=]\s*["']?([^\s"']{3,})["']?/gi,
+      cvv: /(?<!\d)\b\d{3,4}\b(?!\d)/gi,
+      expiry: /\b(0[1-9]|1[0-2])[\/\-]([0-9]{2}|[0-9]{4})\b/gi,
+      address: /\b(?:street|road|st|rd|lane|nagar|colony|sector|block|marg|floor|flat|house|address)\b/i,
+      pin: /\b\d{3}\s?\d{3}\b/g
     };
   }
 
@@ -121,6 +125,8 @@
     return text
       .replace(r.AADHAAR, (m, g1) => m.replace(g1, decoy || '[Aadhaar Redacted]'))
       .replace(r.CREDIT_CARD, (m, g1) => m.replace(g1, decoy || '[REDACTED_CARD]'))
+      .replace(r.EXPIRY, (m, g1) => m.replace(g1, decoy || '[EXP_REDACTED]'))
+      .replace(r.CVV, (m, g1) => m.replace(g1, decoy || '[CVV_REDACTED]'))
       .replace(r.PAN, (m, g1) => m.replace(g1, decoy || '[REDACTED_PAN]'))
       .replace(r.PASSPORT, (m, g1) => m.replace(g1, decoy || '[REDACTED_PASSPORT]'))
       .replace(r.VOTER_ID, (m, g1) => m.replace(g1, decoy || '[REDACTED_VOTER_ID]'))
@@ -511,7 +517,7 @@
         if (response && response.success && response.base64Data) {
           console.log(`%c[SafeLens Engine] ✅ Background Service Worker Redaction Complete: ${response.filename}`, 'color: #00ff00; font-weight: bold;');
           const redactedFile = base64ToFile(response.base64Data, response.filename, response.mimeType);
-          return { file: redactedFile, isRedacted: response.isRedacted };
+          return { file: redactedFile, isRedacted: response.isRedacted, headers: response.headers };
         }
       }
 
@@ -530,25 +536,45 @@
       const blob = await apiResponse.blob();
       const contentDisposition = apiResponse.headers.get('Content-Disposition');
       let outName = fileName;
-      let isRedacted = false;
-
       if (contentDisposition && contentDisposition.includes('filename=')) {
         const match = contentDisposition.match(/filename="?([^"]+)"?/);
         if (match) {
           outName = match[1];
-          if (outName.startsWith('redacted_')) isRedacted = true;
         }
-      } else {
-        outName = `redacted_${fileName}`;
+      }
+
+      const redactedStatus = apiResponse.headers.get('X-Redacted-Status');
+      const piiCountHeader = apiResponse.headers.get('X-PII-Count');
+      const piiCount = piiCountHeader ? parseInt(piiCountHeader, 10) : 0;
+
+      let isRedacted = false;
+      if (redactedStatus === 'REDACTED' || piiCount > 0) {
         isRedacted = true;
+      } else if (redactedStatus === 'CLEAN' || piiCountHeader === '0') {
+        isRedacted = false;
+      } else {
+        // Fallback if headers are not present
+        if (outName.startsWith('redacted_')) {
+          isRedacted = true;
+        } else if (!contentDisposition) {
+          outName = `redacted_${fileName}`;
+          isRedacted = true;
+        }
       }
 
       const processedFile = new File([blob], outName, { type: blob.type || fileType });
-      return { file: processedFile, isRedacted };
+      return {
+        file: processedFile,
+        isRedacted,
+        headers: {
+          'X-Redacted-Status': redactedStatus,
+          'X-PII-Count': piiCountHeader
+        }
+      };
 
     } catch (err) {
       console.error(`%c[SafeLens Engine] ❌ Image Redaction Error:`, 'color: #ff0000; font-weight: bold;', err);
-      return { file: file, isRedacted: false, error: err.message };
+      return { file: file, isRedacted: false, error: err.message, headers: {} };
     }
   }
 
@@ -612,7 +638,21 @@
         if (target.dataset) target.dataset.safelensBypass = 'true';
         target.files = dataTransfer.files;
 
-        if (result.isRedacted) {
+        const headers = result.headers || {};
+        const redactedStatus = headers['X-Redacted-Status'];
+        const piiCountHeader = headers['X-PII-Count'];
+        const piiCount = piiCountHeader ? parseInt(piiCountHeader, 10) : 0;
+
+        let shouldNotify = false;
+        if (redactedStatus === 'REDACTED' || piiCount > 0) {
+          shouldNotify = true;
+        } else if (redactedStatus === 'CLEAN' || piiCountHeader === '0') {
+          shouldNotify = false;
+        } else {
+          shouldNotify = !!result.isRedacted;
+        }
+
+        if (shouldNotify) {
           notifyUser('Sensitive PII detected! Image precisely redacted via OpenCV.', 'success');
         } else {
           notifyUser('Image scanned: No sensitive PII. Upload allowed.', 'success');
@@ -677,7 +717,21 @@
         });
         targetElement.dispatchEvent(pasteEvent);
 
-        if (result.isRedacted) {
+        const headers = result.headers || {};
+        const redactedStatus = headers['X-Redacted-Status'];
+        const piiCountHeader = headers['X-PII-Count'];
+        const piiCount = piiCountHeader ? parseInt(piiCountHeader, 10) : 0;
+
+        let shouldNotify = false;
+        if (redactedStatus === 'REDACTED' || piiCount > 0) {
+          shouldNotify = true;
+        } else if (redactedStatus === 'CLEAN' || piiCountHeader === '0') {
+          shouldNotify = false;
+        } else {
+          shouldNotify = !!result.isRedacted;
+        }
+
+        if (shouldNotify) {
           notifyUser('Sensitive PII in pasted image redacted & injected safely!', 'success');
         } else {
           notifyUser('Pasted image scanned: Safe to insert.', 'success');
@@ -746,7 +800,21 @@
         });
         targetElement.dispatchEvent(dropEvent);
 
-        if (result.isRedacted) {
+        const headers = result.headers || {};
+        const redactedStatus = headers['X-Redacted-Status'];
+        const piiCountHeader = headers['X-PII-Count'];
+        const piiCount = piiCountHeader ? parseInt(piiCountHeader, 10) : 0;
+
+        let shouldNotify = false;
+        if (redactedStatus === 'REDACTED' || piiCount > 0) {
+          shouldNotify = true;
+        } else if (redactedStatus === 'CLEAN' || piiCountHeader === '0') {
+          shouldNotify = false;
+        } else {
+          shouldNotify = !!result.isRedacted;
+        }
+
+        if (shouldNotify) {
           notifyUser('Sensitive PII in dropped image redacted & injected safely!', 'success');
         } else {
           notifyUser('Dropped image scanned: Safe to insert.', 'success');

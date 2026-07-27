@@ -54,19 +54,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error(`FastAPI Image Redaction endpoint returned status ${apiResponse.status}`);
         }
 
-        const contentDisposition = apiResponse.headers.get('Content-Disposition');
-        let outFilename = filename || 'image.png';
-        let isRedacted = false;
+        const redactedStatus = apiResponse.headers.get('X-Redacted-Status');
+        const piiCountHeader = apiResponse.headers.get('X-PII-Count');
+        const piiCount = piiCountHeader ? parseInt(piiCountHeader, 10) : 0;
 
+        let outFilename = filename || 'image.png';
+        const contentDisposition = apiResponse.headers.get('Content-Disposition');
         if (contentDisposition && contentDisposition.includes('filename=')) {
           const match = contentDisposition.match(/filename="?([^"]+)"?/);
           if (match) {
             outFilename = match[1];
-            if (outFilename.startsWith('redacted_')) isRedacted = true;
           }
-        } else {
-          outFilename = `redacted_${filename || 'image.png'}`;
+        }
+
+        let isRedacted = false;
+        if (redactedStatus === 'REDACTED' || piiCount > 0) {
           isRedacted = true;
+        } else if (redactedStatus === 'CLEAN' || piiCountHeader === '0') {
+          isRedacted = false;
+        } else {
+          // Fallback if headers are not present
+          if (outFilename.startsWith('redacted_')) {
+            isRedacted = true;
+          } else if (!contentDisposition) {
+            outFilename = `redacted_${filename || 'image.png'}`;
+            isRedacted = true;
+          }
         }
 
         const redactedBlob = await apiResponse.blob();
@@ -77,7 +90,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           base64Data: base64Redacted,
           filename: outFilename,
           isRedacted: isRedacted,
-          mimeType: redactedBlob.type || type || 'image/png'
+          mimeType: redactedBlob.type || type || 'image/png',
+          headers: {
+            'X-Redacted-Status': redactedStatus,
+            'X-PII-Count': piiCountHeader
+          }
         });
 
       } catch (err) {
