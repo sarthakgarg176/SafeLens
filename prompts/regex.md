@@ -8,4 +8,4 @@ You are an expert Pattern Matching Engineer. Implement a regular expression (reg
 - Match ranges `[startIndex, endIndex]` must extract corresponding overlapping boxes by checking overlap condition: `w.startIndex < endIndex && w.endIndex > startIndex`.
 - Return structured matches: `{ type, value, regexConfidence, ocrConfidence, startIndex, endIndex, bboxes, source: 'regex' }`.
 - Ensure regex patterns are optimized to avoid backtracking issues (prevent ReDoS attacks).
-
+- CVV and EXPIRY regexes must capture their respective digit groups to prevent overlapping matches or incorrect replacements when sanitizing.

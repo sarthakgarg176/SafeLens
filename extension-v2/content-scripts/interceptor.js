@@ -88,7 +88,7 @@
   }
 
   // ==========================================
-  // TEXT REDACTION REGEX & HYDRATION LOGIC (Remains Intact)
+  // TEXT REDACTION REGEX & HYDRATION LOGIC
   // ==========================================
   function createRegexes() {
     return {
@@ -106,8 +106,8 @@
       JWT: /eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/g,
       PRIVATE_KEY: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+)?PRIVATE\s+KEY-----/gi,
       PASSWORD_SECRET: /(?:password|passcode|pwd|secret)\s*[:=]\s*["']?([^\s"']{3,})["']?/gi,
-      cvv: /(?<!\d)\b\d{3,4}\b(?!\d)/gi,
-      expiry: /\b(0[1-9]|1[0-2])[\/\-]([0-9]{2}|[0-9]{4})\b/gi,
+      CVV: /(?<!\d)\b(\d{3,4})\b(?!\d)/gi,
+      EXPIRY: /\b((?:0[1-9]|1[0-2])[\/\-](?:[0-9]{2}|[0-9]{4}))\b/gi,
       address: /\b(?:street|road|st|rd|lane|nagar|colony|sector|block|marg|floor|flat|house|address)\b/i,
       pin: /\b\d{3}\s?\d{3}\b/g
     };
@@ -123,8 +123,9 @@
     if (!text) return '';
     const r = createRegexes();
     return text
-      .replace(r.AADHAAR, (m, g1) => m.replace(g1, decoy || '[Aadhaar Redacted]'))
+      // 🛡️ FIX: CREDIT_CARD evaluation moved BEFORE AADHAAR to prevent 16-digit overlap interception
       .replace(r.CREDIT_CARD, (m, g1) => m.replace(g1, decoy || '[REDACTED_CARD]'))
+      .replace(r.AADHAAR, (m, g1) => m.replace(g1, decoy || '[Aadhaar Redacted]'))
       .replace(r.EXPIRY, (m, g1) => m.replace(g1, decoy || '[EXP_REDACTED]'))
       .replace(r.CVV, (m, g1) => m.replace(g1, decoy || '[CVV_REDACTED]'))
       .replace(r.PAN, (m, g1) => m.replace(g1, decoy || '[REDACTED_PAN]'))
@@ -155,9 +156,16 @@
     return null;
   }
 
-  function findActiveInput() {
+  function findActiveInput(btn) {
     const active = document.activeElement;
-    if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.isContentEditable)) return active;
+    if (active && active !== document.body && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.isContentEditable)) return active;
+    if (btn) {
+      const container = btn.closest('form, div.card, div.container, [class*="chat"], [class*="prompt"]') || btn.parentElement;
+      if (container) {
+        const input = container.querySelector('textarea, [contenteditable="true"], input[type="text"]');
+        if (input) return input;
+      }
+    }
     return document.querySelector('textarea, [contenteditable="true"], input[type="text"]');
   }
 
@@ -444,13 +452,18 @@
 
   function handlePointerClickEvent(e) {
     if (bypassInterception) return;
+    const formSubmitBtn = e.target.closest ? e.target.closest('button[type="submit"], input[type="submit"], form button') : null;
+    if (formSubmitBtn && formSubmitBtn.form) {
+      return;
+    }
+
     const clickedSendBtn = findClickedSendButton(e.target, e);
     if (clickedSendBtn) {
       if (isSubmitting || isRedacting || isEvaluating) {
         e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
         return;
       }
-      const activeInput = findActiveInput();
+      const activeInput = findActiveInput(clickedSendBtn);
       if (activeInput) {
         const rawText = getRawText(activeInput);
         if (rawText && rawText.trim()) handleSubmissionIntent(e, activeInput, clickedSendBtn);
@@ -579,16 +592,100 @@
   }
 
   function handleFormSubmit(e) {
+    const form = e.target;
     if (isEvaluating || isSubmitting || isRedacting) { e.preventDefault(); e.stopPropagation(); return; }
-    if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href) || e.target.tagName !== 'FORM') return;
-    e.preventDefault();
+    if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href) || !form || form.tagName !== 'FORM') return;
 
-    const formData = new FormData(e.target);
-    chrome.runtime.sendMessage({ action: 'PROCESS_TEXT_FORM', payload: Object.fromEntries(formData.entries()) }, (res) => {
-      if (!chrome.runtime.lastError && res && (res.status === 'success' || res.success === true)) {
-        notifyUser('Sensitive Form Data Swapped with Synthetic Decoy!', 'success');
+    if (form.getAttribute('data-safelens-bypass') === 'true' || form.dataset?.safelensBypass === 'true') {
+      console.log('%c[SafeLens Engine] 🔄 Bypass flag detected on form submit event. Permitting submit.', 'color: #888888;');
+      form.removeAttribute('data-safelens-bypass');
+      if (form.dataset) form.dataset.safelensBypass = 'false';
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+    const formData = new FormData(form);
+    const formPayload = Object.fromEntries(formData.entries());
+    let anyRedacted = false;
+
+    const inputs = form.querySelectorAll('input[type="text"], input[type="email"], input:not([type]), textarea');
+    inputs.forEach(inputEl => {
+      const rawVal = inputEl.value;
+      const name = inputEl.getAttribute('name');
+      if (rawVal && name && typeof formPayload[name] === 'string') {
+        const sanitized = sanitizeTextLocally(rawVal);
+        if (sanitized !== rawVal) {
+          formPayload[name] = sanitized;
+          anyRedacted = true;
+        }
       }
     });
+
+    if (anyRedacted) {
+      notifyUser('Sensitive Form Data Swapped with Synthetic Decoy!', 'success');
+    }
+
+    form.setAttribute('data-safelens-bypass', 'true');
+    if (form.dataset) form.dataset.safelensBypass = 'true';
+
+    const submitWithPayload = (finalPayload) => {
+      const hiddenInputs = [];
+      const originalNames = new Map();
+      const allElements = form.querySelectorAll('input, textarea, select');
+      
+      allElements.forEach(el => {
+        if (el.type === 'file') return;
+        if (el.hasAttribute('name')) {
+          originalNames.set(el, el.getAttribute('name'));
+          el.removeAttribute('name');
+        }
+      });
+
+      Object.entries(finalPayload).forEach(([key, value]) => {
+        if (typeof value !== 'string') return;
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = key;
+        hidden.value = value;
+        form.appendChild(hidden);
+        hiddenInputs.push(hidden);
+      });
+
+      dispatchSyntheticSubmit(form);
+
+      hiddenInputs.forEach(el => el.remove());
+      originalNames.forEach((name, el) => {
+        el.setAttribute('name', name);
+      });
+    };
+
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ action: 'PROCESS_TEXT_FORM', payload: formPayload }, (res) => {
+        let finalPayload = formPayload;
+        if (!chrome.runtime.lastError && res && res.payload && typeof res.payload === 'object') {
+          finalPayload = { ...formPayload, ...res.payload };
+        }
+        submitWithPayload(finalPayload);
+      });
+    } else {
+      submitWithPayload(formPayload);
+    }
+  }
+
+  function dispatchSyntheticSubmit(form) {
+    try {
+      const submitEvent = new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter: form.querySelector('button[type="submit"], input[type="submit"]') });
+      form.dispatchEvent(submitEvent);
+    } catch (_) {
+      try {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      } catch (err) {
+        if (typeof form.submit === 'function') form.submit();
+      }
+    }
   }
 
   // ==========================================

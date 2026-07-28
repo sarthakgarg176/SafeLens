@@ -15,4 +15,4 @@ You are an expert Frontend Integration Engineer. Implement an upload interceptio
 - Include a binding registry memory purging routine (using `element.isConnected`) to prevent memory leaks in dynamic Single Page Applications.
 - Cache the event interceptor callback functions at the module scope level rather than recreating closures inside mutation observer sweeps to prevent memory leaks on dynamic DOM nodes.
 - Dispatch parallel statistics reports and await their completion using `Promise.all` before completing the file upload interception event.
-
+- When intercepting HTML form submissions, extract payload data via `FormData`, sanitize the payload object locally, and inject the sanitized data via temporary hidden inputs (swapping `name` attributes of visible inputs). This ensures the outgoing synthetic `submit` event sends the redacted data without modifying the visual DOM inputs.

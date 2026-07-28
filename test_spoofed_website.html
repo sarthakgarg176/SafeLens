@@ -294,22 +294,22 @@
     <header>
       <div class="badge">SafeLens AI Shield Test Suite</div>
       <h1>Spoofed Webpage & Synthetic Data Receiver</h1>
-      <p class="subtitle">Enter sensitive PII data below to test how SafeLens intercepts it and transmits synthetic decoys to the receiver.</p>
+      <p class="subtitle">Enter sensitive PII data below to test how SafeLens intercepts form submissions and transmits synthetic decoys to the receiver.</p>
     </header>
 
     <div class="grid">
-      <!-- LEFT COLUMN: Spoofed Website Form & AI Prompt Box -->
+      <!-- LEFT COLUMN: Spoofed Website Form -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">
-            <span>🌐</span> Spoofed Form / AI Prompt Interface
+            <span>🌐</span> Spoofed Form Interface
           </div>
           <button type="button" class="btn btn-secondary" onclick="autofillSampleData()" style="width: auto; padding: 6px 12px; margin: 0; font-size: 0.82rem;">
             ⚡ Auto-Fill Sample PII
           </button>
         </div>
 
-        <!-- 1. FORM INTERCEPTION TEST -->
+        <!-- FORM INTERCEPTION TEST -->
         <form id="spoofedForm" action="#" method="POST" onsubmit="handleFormSubmission(event)">
           <div class="form-group">
             <label for="fullName">Full Name / Account Holder</label>
@@ -352,17 +352,6 @@
             🔒 Submit Form Data to Receiver
           </button>
         </form>
-
-        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 1.8rem 0;">
-
-        <!-- 2. AI CHATBOT PROMPT TEST -->
-        <div class="form-group">
-          <label for="promptBox">AI Prompt Box (Simulates ChatGPT / Gemini prompt input)</label>
-          <textarea id="promptBox" placeholder="Type prompt containing PII (e.g. 'My Aadhaar is 9876 5432 1098 and my card is 4532 0154 9876 1234')"></textarea>
-        </div>
-        <button type="button" class="btn" id="sendPromptBtn" onclick="handlePromptSubmission(event)">
-          🤖 Send Prompt to AI Receiver
-        </button>
       </div>
 
       <!-- RIGHT COLUMN: Real-Time Receiver Terminal -->
@@ -383,7 +372,7 @@
         <div class="terminal" id="terminalLog">
           <div style="color: #6272a4; text-align: center; padding-top: 80px;">
             [Receiver Ready]<br>
-            Waiting for form submission or prompt send event...
+            Waiting for form submission event...
           </div>
         </div>
       </div>
@@ -394,7 +383,7 @@
       <ol>
         <li>Make sure the <strong>SafeLens Chrome Extension</strong> is loaded and enabled.</li>
         <li>Click <strong>"Auto-Fill Sample PII"</strong> to fill in test sensitive data.</li>
-        <li>Click <strong>"Submit Form Data"</strong> or <strong>"Send Prompt to AI Receiver"</strong>.</li>
+        <li>Click <strong>"Submit Form Data to Receiver"</strong>.</li>
         <li>Check the <strong>Website Receiver Payload Inspector</strong>:
           <ul>
             <li>When SafeLens is active, it intercepts the submit event and replaces sensitive fields with synthetic decoys or redacted placeholders (e.g. <code>[REDACTED_CARD]</code>, <code>[EXP_REDACTED]</code>, <code>[CVV_REDACTED]</code>, or synthetic values). The terminal tags the payload with <span style="color:#00e676;">🛡️ SYNTHETIC DECOY SWAPPED</span>.</li>
@@ -414,14 +403,13 @@
       document.getElementById('aadhaar').value = "9876 5432 1098";
       document.getElementById('phone').value = "+91 9876543210";
       document.getElementById('email').value = "rahul.sharma@example.com";
-      document.getElementById('promptBox').value = "Please analyze this user: Rahul Sharma, Aadhaar: 9876 5432 1098, Card: 4532 0154 9876 1234, Expiry: 12/28, CVV: 492, Phone: 9876543210";
     }
 
     function clearTerminal() {
       document.getElementById('terminalLog').innerHTML = `
         <div style="color: #6272a4; text-align: center; padding-top: 80px;">
           [Receiver Ready]<br>
-          Waiting for form submission or prompt send event...
+          Waiting for form submission event...
         </div>`;
     }
 
@@ -469,14 +457,6 @@
       
       console.log("[Spoofed Receiver] Form submitted. Payload captured by receiver:", data);
       logToTerminal('HTML <form> Submit', data);
-    }
-
-    function handlePromptSubmission(e) {
-      const textarea = document.getElementById('promptBox');
-      const promptText = textarea ? textarea.value : '';
-      
-      console.log("[Spoofed Receiver] AI Prompt submitted. Payload captured by receiver:", promptText);
-      logToTerminal('AI Prompt Input', { prompt: promptText });
     }
   </script>
 </body>
