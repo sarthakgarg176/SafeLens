@@ -18,9 +18,25 @@
       </label>
     </div>
 
-    <div class="status-line">
-      <span id="statusDot" class="safelens-status-dot safelens-status-dot--success"></span>
-      <span id="statusText">Protection Active</span>
+    <div class="snooze-section">
+      <div class="section-title">Smart Pause / Snooze</div>
+      <div id="pauseControls" class="snooze-controls">
+        <select id="pauseDurationSelect" class="snooze-select">
+          <option value="30m">Pause for 30 Mins</option>
+          <option value="1h">Pause for 1 Hour</option>
+          <option value="1d">Pause for 1 Day</option>
+          <option value="indefinite">Pause Until Reactivated</option>
+        </select>
+        <button id="pauseActionBtn" class="snooze-btn">Pause</button>
+      </div>
+    </div>
+
+    <div class="status-box">
+      <div class="status-line">
+        <span id="statusDot" class="safelens-status-dot safelens-status-dot--success"></span>
+        <span id="statusText">Protection Active</span>
+      </div>
+      <div id="countdownDisplay" class="countdown-text" style="display: none;"></div>
     </div>
   </div>
   <script src="popup.js"></script>

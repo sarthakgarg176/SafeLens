@@ -11,9 +11,39 @@ import { getSettings } from './feature-flags.js';
 import { runLegacyRules } from './rules-engine.js';
 import { sendToBackend } from './api-client.js';
 
+async function checkAutoReactivate() {
+  try {
+    const data = await chrome.storage.local.get(['extensionPaused', 'pauseUntilTimestamp']);
+    if (data.extensionPaused && data.pauseUntilTimestamp && Date.now() >= data.pauseUntilTimestamp) {
+      await chrome.storage.local.set({ extensionPaused: false, pauseUntilTimestamp: null });
+      if (typeof chrome !== 'undefined' && chrome.alarms) {
+        chrome.alarms.clear('safelens_auto_reactivate');
+      }
+      console.log('[SafeLens] SafeLens AI Shield Reactivated! Snooze timer expired.');
+    }
+  } catch (err) {
+    console.warn('[SafeLens] Error in checkAutoReactivate:', err);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[SafeLens] Background service worker initialized (v2 - Hybrid AI Engine).');
+  checkAutoReactivate();
 });
+
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(() => {
+    checkAutoReactivate();
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.alarms) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm && alarm.name === 'safelens_auto_reactivate') {
+      checkAutoReactivate();
+    }
+  });
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'PROCESS_IMAGE') {

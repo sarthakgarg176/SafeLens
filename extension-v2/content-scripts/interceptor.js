@@ -17,13 +17,19 @@
 
   let DYNAMIC_WHITELIST = ['gov.in', 'nic.in', 'uidai.gov.in'];
 
+  window.SAFELENS_PAUSED = false;
+  window.SAFELENS_PAUSE_UNTIL = null;
+
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['customWhitelist', 'extensionPaused'], (result) => {
+    chrome.storage.local.get(['customWhitelist', 'extensionPaused', 'pauseUntilTimestamp'], (result) => {
       if (result.customWhitelist && Array.isArray(result.customWhitelist)) {
         DYNAMIC_WHITELIST = Array.from(new Set([...DYNAMIC_WHITELIST, ...result.customWhitelist]));
       }
       if (result.extensionPaused === true) {
         window.SAFELENS_PAUSED = true;
+      }
+      if (result.pauseUntilTimestamp) {
+        window.SAFELENS_PAUSE_UNTIL = result.pauseUntilTimestamp;
       }
     });
 
@@ -33,14 +39,31 @@
           DYNAMIC_WHITELIST = Array.from(new Set(['gov.in', 'nic.in', 'uidai.gov.in', ...changes.customWhitelist.newValue]));
         }
         if (changes.extensionPaused !== undefined) {
-          window.SAFELENS_PAUSED = changes.extensionPaused.newValue;
+          window.SAFELENS_PAUSED = !!changes.extensionPaused.newValue;
+        }
+        if (changes.pauseUntilTimestamp !== undefined) {
+          window.SAFELENS_PAUSE_UNTIL = changes.pauseUntilTimestamp.newValue || null;
         }
       }
     });
   }
 
+  function isPaused() {
+    if (!window.SAFELENS_PAUSED) return false;
+    if (window.SAFELENS_PAUSE_UNTIL && Date.now() >= window.SAFELENS_PAUSE_UNTIL) {
+      window.SAFELENS_PAUSED = false;
+      window.SAFELENS_PAUSE_UNTIL = null;
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ extensionPaused: false, pauseUntilTimestamp: null });
+      }
+      notifyUser('SafeLens AI Shield Reactivated!', 'success');
+      return false;
+    }
+    return true;
+  }
+
   function isDomainWhitelisted(url) {
-    if (window.SAFELENS_PAUSED) return false;
+    if (isPaused()) return false;
     try {
       const hostname = new URL(url).hostname.toLowerCase();
       const safeProductivity = ['whatsapp.com', 'linkedin.com', 'mail.google.com', 'docs.google.com', 'drive.google.com'];
@@ -105,7 +128,7 @@
       API_KEY: /(?:key|token|secret|api[_\-]?key|aws[_\-]?access[_\-]?key[_\-]?id|aws[_\-]?secret[_\-]?access[_\-]?key)\s*[:=]\s*["']?[A-Za-z0-9\-_/+=]{16,}["']?|(?:pk|sk)_(?:test|live)_[0-9a-zA-Z]{24,}|(?:AKIA|ASIA)[0-9A-Z]{16}/gi,
       JWT: /eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/g,
       PRIVATE_KEY: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+)?PRIVATE\s+KEY-----/gi,
-      PASSWORD_SECRET: /(?:password|passcode|pwd|secret)\s*[:=]\s*["']?([^\s"']{3,})["']?/gi,
+      PASSWORD_SECRET: /(?:password|passcode|pwd|secret).{0,25}?\b([a-zA-Z0-9_!@#$%^&*]{6,})\b/gi,
       CVV: /(?<!\d)\b(\d{3,4})\b(?!\d)/gi,
       EXPIRY: /\b((?:0[1-9]|1[0-2])[\/\-](?:[0-9]{2}|[0-9]{4}))\b/gi,
       address: /\b(?:street|road|st|rd|lane|nagar|colony|sector|block|marg|floor|flat|house|address)\b/i,
@@ -122,24 +145,50 @@
   function sanitizeTextLocally(text, decoy) {
     if (!text) return '';
     const r = createRegexes();
-    return text
-      // 🛡️ FIX: CREDIT_CARD evaluation moved BEFORE AADHAAR to prevent 16-digit overlap interception
-      .replace(r.CREDIT_CARD, (m, g1) => m.replace(g1, decoy || '[REDACTED_CARD]'))
-      .replace(r.AADHAAR, (m, g1) => m.replace(g1, decoy || '[Aadhaar Redacted]'))
-      .replace(r.EXPIRY, (m, g1) => m.replace(g1, decoy || '[EXP_REDACTED]'))
-      .replace(r.CVV, (m, g1) => m.replace(g1, decoy || '[CVV_REDACTED]'))
-      .replace(r.PAN, (m, g1) => m.replace(g1, decoy || '[REDACTED_PAN]'))
-      .replace(r.PASSPORT, (m, g1) => m.replace(g1, decoy || '[REDACTED_PASSPORT]'))
-      .replace(r.VOTER_ID, (m, g1) => m.replace(g1, decoy || '[REDACTED_VOTER_ID]'))
-      .replace(r.DRIVING_LICENSE, (m, g1) => m.replace(g1, decoy || '[REDACTED_DL]'))
-      .replace(r.IFSC, (m, g1) => m.replace(g1, decoy || '[REDACTED_IFSC]'))
-      .replace(r.UPI_ID, () => decoy || '[REDACTED_UPI_ID]')
-      .replace(r.PHONE, (m, g1) => m.replace(g1, decoy || '[REDACTED_PHONE]'))
-      .replace(r.EMAIL, () => decoy || '[REDACTED_EMAIL]')
-      .replace(r.API_KEY, () => decoy || '[REDACTED_API_KEY]')
-      .replace(r.JWT, () => decoy || '[REDACTED_JWT_TOKEN]')
-      .replace(r.PRIVATE_KEY, () => decoy || '[REDACTED_PRIVATE_KEY]')
-      .replace(r.PASSWORD_SECRET, (m, g1) => m.replace(g1, decoy || '[REDACTED_SECRET]'));
+
+    const getDecoy = (realistic, staticTag) => {
+      if (decoy === false) return staticTag;
+      if (typeof decoy === 'string') return decoy;
+      return realistic;
+    };
+
+    // PASS 1: Replace matches with unique placeholders
+    let pass1 = text
+      .replace(r.CREDIT_CARD, (m, g1) => m.replace(g1, '__CARD_PH__'))
+      .replace(r.AADHAAR, (m, g1) => m.replace(g1, '__AADHAAR_PH__'))
+      .replace(r.EXPIRY, (m, g1) => m.replace(g1, '__EXPIRY_PH__'))
+      .replace(r.CVV, (m, g1) => m.replace(g1, '__CVV_PH__'))
+      .replace(r.PAN, (m, g1) => m.replace(g1, '__PAN_PH__'))
+      .replace(r.PASSPORT, (m, g1) => m.replace(g1, '__PASSPORT_PH__'))
+      .replace(r.VOTER_ID, (m, g1) => m.replace(g1, '__VOTER_ID_PH__'))
+      .replace(r.DRIVING_LICENSE, (m, g1) => m.replace(g1, '__DRIVING_LICENSE_PH__'))
+      .replace(r.IFSC, (m, g1) => m.replace(g1, '__IFSC_PH__'))
+      .replace(r.EMAIL, () => '__EMAIL_PH__')
+      .replace(r.UPI_ID, () => '__UPI_ID_PH__')
+      .replace(r.PHONE, (m, g1) => m.replace(g1, '__PHONE_PH__'))
+      .replace(r.API_KEY, () => '__API_KEY_PH__')
+      .replace(r.JWT, () => '__JWT_PH__')
+      .replace(r.PRIVATE_KEY, () => '__PRIVATE_KEY_PH__')
+      .replace(r.PASSWORD_SECRET, (m, g1) => m.replace(g1, '__PASSWORD_SECRET_PH__'));
+
+    // PASS 2: Replace placeholders with realistic decoys or static tags
+    return pass1
+      .replace(/__CARD_PH__/g, getDecoy("4532 0154 9876 5558", '[REDACTED_CARD]'))
+      .replace(/__AADHAAR_PH__/g, getDecoy("9876 5432 1090", '[Aadhaar Redacted]'))
+      .replace(/__EXPIRY_PH__/g, getDecoy("10/30", '[EXP_REDACTED]'))
+      .replace(/__CVV_PH__/g, getDecoy("726", '[CVV_REDACTED]'))
+      .replace(/__PAN_PH__/g, getDecoy("ABCDE1234F", '[REDACTED_PAN]'))
+      .replace(/__PASSPORT_PH__/g, getDecoy("A1234567", '[REDACTED_PASSPORT]'))
+      .replace(/__VOTER_ID_PH__/g, getDecoy("ABC1234567", '[REDACTED_VOTER_ID]'))
+      .replace(/__DRIVING_LICENSE_PH__/g, getDecoy("DL-1420110012345", '[REDACTED_DL]'))
+      .replace(/__IFSC_PH__/g, getDecoy("SBIN0001234", '[REDACTED_IFSC]'))
+      .replace(/__UPI_ID_PH__/g, getDecoy("user@okhdfcbank", '[REDACTED_UPI_ID]'))
+      .replace(/__PHONE_PH__/g, getDecoy("9876543211", '[REDACTED_PHONE]'))
+      .replace(/__EMAIL_PH__/g, getDecoy("rahul.sharma88@gmail.com", '[REDACTED_EMAIL]'))
+      .replace(/__API_KEY_PH__/g, getDecoy("AKIAIOSFODNN7EXAMPLE", '[REDACTED_API_KEY]'))
+      .replace(/__JWT_PH__/g, getDecoy("eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", '[REDACTED_JWT_TOKEN]'))
+      .replace(/__PRIVATE_KEY_PH__/g, getDecoy("-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----", '[REDACTED_PRIVATE_KEY]'))
+      .replace(/__PASSWORD_SECRET_PH__/g, getDecoy("S3cr3tP@ssw0rd!", '[REDACTED_SECRET]'));
   }
 
   function getRootEditable(target, event) {
@@ -157,34 +206,47 @@
   }
 
   function findActiveInput(btn) {
+    const promptArea = document.querySelector('#prompt-textarea');
+    if (promptArea && getRawText(promptArea).trim().length > 0) return promptArea;
+
     const active = document.activeElement;
-    if (active && active !== document.body && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.isContentEditable)) return active;
+    if (active && active !== document.body && active.tagName !== 'BUTTON' && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.isContentEditable)) {
+      return active;
+    }
+
     if (btn) {
-      const container = btn.closest('form, div.card, div.container, [class*="chat"], [class*="prompt"]') || btn.parentElement;
+      const container = btn.closest('form, div.card, div.container, [class*="chat"], [class*="prompt"], [class*="composer"], [class*="input"], fieldset') || btn.parentElement;
       if (container) {
-        const input = container.querySelector('textarea, [contenteditable="true"], input[type="text"]');
+        const input = container.querySelector('#prompt-textarea, textarea, [contenteditable="true"], .ProseMirror, [data-lexical-editor="true"], input[type="text"]');
         if (input) return input;
       }
     }
-    return document.querySelector('textarea, [contenteditable="true"], input[type="text"]');
+
+    return document.querySelector('#prompt-textarea, textarea, [contenteditable="true"], .ProseMirror, [data-lexical-editor="true"], input[type="text"]');
   }
 
   function findSendButton(event) {
     const selectors = [
-      'button[aria-label*="Send"]',
-      'button[aria-label*="Grok"]',
-      'button[aria-label*="Submit"]',
-      'button[aria-label*="Search"]',
-      'button[data-testid="send-button"]',
+      'button[aria-label*="Send" i]',
+      'button[aria-label*="Grok" i]',
+      'button[aria-label*="Submit" i]',
+      'button[aria-label*="Search" i]',
+      'button[data-testid*="send" i]',
+      'button[data-testid*="submit" i]',
       'button[type="submit"]',
-      'button.send-button'
+      'button.send-button',
+      '[role="button"][aria-label*="Send" i]',
+      '[role="button"][data-testid*="send" i]',
+      '[data-testid="send-button"]',
+      '[aria-label*="Send" i]',
+      '[aria-label*="Submit" i]'
     ];
     if (event && event.composedPath) {
       const path = event.composedPath();
       for (const el of path) {
-        if (el && el.tagName === 'BUTTON') {
+        if (el && el.matches) {
           for (const sel of selectors) {
-            if (el.matches && el.matches(sel)) return el;
+            if (el.matches(sel)) return el;
           }
         }
       }
@@ -200,8 +262,24 @@
     if (!inputEl) return;
     inputEl.focus();
     const isMetaAI = window.location.hostname.includes('meta.ai');
+    const isGemini = window.location.hostname.includes('gemini.google.com');
 
-    if (window.location.hostname.includes('gemini.google.com')) {
+    const triggerReactChange = (el, val) => {
+      try {
+        const reactKey = Object.keys(el).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactProps$') || k.startsWith('__reactEvents$'));
+        if (reactKey && el[reactKey]) {
+          const props = el[reactKey].memoizedProps || el[reactKey].pendingProps;
+          if (props && typeof props.onChange === 'function') {
+            props.onChange({ target: { value: val }, currentTarget: { value: val } });
+          }
+          if (props && typeof props.onInput === 'function') {
+            props.onInput({ target: { value: val }, currentTarget: { value: val } });
+          }
+        }
+      } catch (_) {}
+    };
+
+    if (isGemini) {
       const targetEl = inputEl.querySelector('[contenteditable="true"]') || inputEl;
       targetEl.focus();
       const selection = window.getSelection();
@@ -210,6 +288,8 @@
       range.selectNodeContents(targetEl);
       selection.addRange(range);
       document.execCommand('insertText', false, text);
+      triggerReactChange(targetEl, text);
+      targetEl.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: text, bubbles: true, composed: true }));
       targetEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
       return;
     }
@@ -225,13 +305,8 @@
         selection.addRange(range);
         document.execCommand('delete', false, null);
         document.execCommand('insertText', false, text);
-        const reactKey = Object.keys(targetEl).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactProps$'));
-        if (reactKey && targetEl[reactKey]) {
-          const props = targetEl[reactKey].memoizedProps || targetEl[reactKey].pendingProps;
-          if (props && typeof props.onChange === 'function') {
-            props.onChange({ target: { value: text }, currentTarget: { value: text } });
-          }
-        }
+        triggerReactChange(targetEl, text);
+        targetEl.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: text, bubbles: true, composed: true }));
         targetEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         return;
       } catch (err) { }
@@ -254,8 +329,10 @@
             inputEl.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true, composed: true }));
           } catch (_) { inputEl.textContent = text; }
         }
+        triggerReactChange(inputEl, text);
         inputEl.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertFromPaste', data: text, bubbles: true, composed: true }));
         inputEl.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: text, bubbles: true, composed: true }));
+        inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
       } catch (err) { inputEl.textContent = text; }
     } else {
@@ -265,7 +342,9 @@
         const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
         if (inputEl._valueTracker) inputEl._valueTracker.setValue(text);
         if (nativeSetter) { nativeSetter.call(inputEl, text); } else { inputEl.value = text; }
+        triggerReactChange(inputEl, text);
         inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, composed: true, inputType: 'insertText', data: text }));
+        inputEl.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
         inputEl.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
       } catch (_) { inputEl.value = text; }
     }
@@ -276,26 +355,36 @@
     const selectors = [
       'button[aria-label*="Send" i]', 'button[aria-label*="Grok" i]', 'button[aria-label*="Submit" i]',
       'button[aria-label*="Search" i]', 'button[data-testid*="send" i]', 'button[data-testid*="submit" i]',
-      'button[type="submit"]', 'button.send-button', '[role="button"][aria-label*="Send" i]', '[role="button"][aria-label*="Submit" i]'
+      'button[type="submit"]', 'button.send-button', '[role="button"][aria-label*="Send" i]', '[role="button"][aria-label*="Submit" i]',
+      '[role="button"][data-testid*="send" i]', '[aria-label*="Send" i]', '[aria-label*="Submit" i]', '[data-testid*="send" i]'
     ];
     let current = target;
-    while (current && current !== document) {
-      if (current.tagName === 'BUTTON' || current.getAttribute('role') === 'button') {
-        for (const sel of selectors) { if (current.matches && current.matches(sel)) return current; }
-        const lowerClass = (current.className || '').toString().toLowerCase();
-        const lowerId = (current.id || '').toString().toLowerCase();
-        if (lowerClass.includes('send') || lowerClass.includes('submit') || lowerId.includes('send') || lowerId.includes('submit')) return current;
-        const form = current.closest('form');
-        if (form) {
-          const hasInput = form.querySelector('textarea, [contenteditable="true"]');
-          if (hasInput && (current.tagName === 'BUTTON' || current.getAttribute('type') === 'submit')) return current;
+    let depth = 0;
+    while (current && current !== document && depth < 6) {
+      if (current.matches) {
+        for (const sel of selectors) {
+          if (current.matches(sel)) return current;
         }
       }
-      if (current.tagName === 'svg' || current.tagName === 'path') {
-        const parentBtn = current.closest('button, [role="button"]');
-        if (parentBtn) return findClickedSendButton(parentBtn, event);
+      const tag = (current.tagName || '').toLowerCase();
+      const role = (current.getAttribute && current.getAttribute('role')) || '';
+      const ariaLabel = (current.getAttribute && current.getAttribute('aria-label')) || '';
+      const dataTestId = (current.getAttribute && current.getAttribute('data-testid')) || '';
+      const lowerClass = (current.className || '').toString().toLowerCase();
+      const lowerId = (current.id || '').toString().toLowerCase();
+
+      if (tag === 'button' || role === 'button' || tag === 'svg' || tag === 'path' || tag === 'div' || tag === 'span') {
+        if (/send|submit|grok|search/i.test(ariaLabel) || /send|submit/i.test(dataTestId)) return current;
+        if (lowerClass.includes('send') || lowerClass.includes('submit') || lowerId.includes('send') || lowerId.includes('submit')) return current;
+        
+        const form = current.closest ? current.closest('form') : null;
+        if (form) {
+          const hasInput = form.querySelector('textarea, [contenteditable="true"]');
+          if (hasInput && (tag === 'button' || role === 'button' || current.getAttribute('type') === 'submit')) return current;
+        }
       }
       current = current.parentElement;
+      depth++;
     }
     return null;
   }
@@ -348,26 +437,36 @@
   async function executeFinalSubmission(inputEl, sendBtn) {
     hideOverlay();
     if (inputEl) inputEl.style.opacity = '1';
-    const isMetaAI = window.location.hostname.includes('meta.ai');
-    const isGemini = window.location.hostname.includes('gemini.google.com');
-    await new Promise(r => setTimeout(r, isMetaAI ? 200 : (isGemini ? 150 : 120)));
+    
+    // 1. Give React's Virtual DOM time to sync before clicking to avoid Error 418/404
+    await new Promise(r => setTimeout(r, 250));
 
     const freshBtn = findSendButton();
     const liveBtn = (freshBtn && freshBtn.isConnected) ? freshBtn : (sendBtn && sendBtn.isConnected ? sendBtn : null);
 
     bypassInterception = true;
     try {
+      const isMetaAI = window.location.hostname.includes('meta.ai');
       if (isMetaAI) {
         const metaEditor = document.querySelector('[contenteditable="true"]') || inputEl;
         await new Promise(r => setTimeout(r, 250));
         metaEditor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, composed: true }));
       } else if (liveBtn && typeof liveBtn.click === 'function' && !liveBtn.disabled) {
+        // 2. Clean click if button is naturally enabled
         liveBtn.click();
       } else if (inputEl) {
+        // 3. Clean fallback to Enter key (No aggressive keypress sequence)
+        inputEl.focus();
         inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, composed: true }));
       }
     } finally {
-      setTimeout(() => { bypassInterception = false; isSubmitting = false; isRedacting = false; isEvaluating = false; hideOverlay(); }, 100);
+      setTimeout(() => {
+        bypassInterception = false;
+        isSubmitting = false;
+        isRedacting = false;
+        isEvaluating = false;
+        hideOverlay();
+      }, 200);
     }
   }
 
@@ -381,7 +480,7 @@
   }
 
   function handleSubmissionIntent(e, inputEl, sendBtn) {
-    if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href) || !isAIChatbot() || !inputEl) return;
+    if (isPaused() || isDomainWhitelisted(window.location.href) || !isAIChatbot() || !inputEl) return;
     if (isSubmitting || isEvaluating) return;
     const rawText = getRawText(inputEl);
     if (!rawText || !rawText.trim()) return;
@@ -390,7 +489,7 @@
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     if (e.stopPropagation) e.stopPropagation();
 
-    let sanitized = sanitizeTextLocally(rawText);
+    let sanitized = sanitizeTextLocally(rawText, false);
     const locallyRedacted = (sanitized !== rawText);
 
     if (locallyRedacted) {
@@ -460,13 +559,19 @@
     const clickedSendBtn = findClickedSendButton(e.target, e);
     if (clickedSendBtn) {
       if (isSubmitting || isRedacting || isEvaluating) {
-        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        e.preventDefault(); e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         return;
       }
       const activeInput = findActiveInput(clickedSendBtn);
       if (activeInput) {
         const rawText = getRawText(activeInput);
-        if (rawText && rawText.trim()) handleSubmissionIntent(e, activeInput, clickedSendBtn);
+        if (rawText && rawText.trim()) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          handleSubmissionIntent(e, activeInput, clickedSendBtn);
+        }
       }
     }
   }
@@ -594,7 +699,7 @@
   function handleFormSubmit(e) {
     const form = e.target;
     if (isEvaluating || isSubmitting || isRedacting) { e.preventDefault(); e.stopPropagation(); return; }
-    if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href) || !form || form.tagName !== 'FORM') return;
+    if (isPaused() || isDomainWhitelisted(window.location.href) || !form || form.tagName !== 'FORM') return;
 
     if (form.getAttribute('data-safelens-bypass') === 'true' || form.dataset?.safelensBypass === 'true') {
       console.log('%c[SafeLens Engine] 🔄 Bypass flag detected on form submit event. Permitting submit.', 'color: #888888;');
@@ -611,12 +716,12 @@
     const formPayload = Object.fromEntries(formData.entries());
     let anyRedacted = false;
 
-    const inputs = form.querySelectorAll('input[type="text"], input[type="email"], input:not([type]), textarea');
+    const inputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea');
     inputs.forEach(inputEl => {
       const rawVal = inputEl.value;
       const name = inputEl.getAttribute('name');
       if (rawVal && name && typeof formPayload[name] === 'string') {
-        const sanitized = sanitizeTextLocally(rawVal);
+        const sanitized = sanitizeTextLocally(rawVal, true);
         if (sanitized !== rawVal) {
           formPayload[name] = sanitized;
           anyRedacted = true;
@@ -664,11 +769,7 @@
 
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'PROCESS_TEXT_FORM', payload: formPayload }, (res) => {
-        let finalPayload = formPayload;
-        if (!chrome.runtime.lastError && res && res.payload && typeof res.payload === 'object') {
-          finalPayload = { ...formPayload, ...res.payload };
-        }
-        submitWithPayload(finalPayload);
+        submitWithPayload(formPayload);
       });
     } else {
       submitWithPayload(formPayload);
@@ -695,6 +796,7 @@
     document.addEventListener('keydown', handleKeydownEvent, { capture: true, passive: false });
     document.addEventListener('keypress', handleKeyupAndPress, { capture: true, passive: false });
     document.addEventListener('keyup', handleKeyupAndPress, { capture: true, passive: false });
+    document.addEventListener('pointerdown', handlePointerClickEvent, { capture: true, passive: false });
     document.addEventListener('mousedown', handlePointerClickEvent, { capture: true, passive: false });
     document.addEventListener('click', handlePointerClickEvent, { capture: true, passive: false });
     document.addEventListener('submit', handleFormSubmit, { capture: true, passive: false });
@@ -703,7 +805,7 @@
     document.addEventListener('change', (e) => {
       const target = e.target;
       if (!target || target.tagName !== 'INPUT' || target.type !== 'file') return;
-      if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href)) return;
+      if (isPaused() || isDomainWhitelisted(window.location.href)) return;
 
       if (target.getAttribute('data-safelens-bypass') === 'true' || target.dataset?.safelensBypass === 'true') {
         console.log('%c[SafeLens Engine] 🔄 Bypass flag detected on file input. Permitting event.', 'color: #888888;');
