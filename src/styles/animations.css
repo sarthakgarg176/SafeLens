@@ -1,0 +1,101 @@
+/* ==========================================================================
+   SafeLens 2.0 - Micro-Animations & Staggered Cascade Engine
+   ========================================================================== */
+
+/* Slide-in & Fade animation for dashboard loaders and grids */
+@keyframes slideDownFade {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Pulsing neon glows for status nodes */
+@keyframes neonPulseGreen {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+  }
+}
+
+@keyframes neonPulseAmber {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 153, 0, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 153, 0, 0.5);
+  }
+}
+
+@keyframes neonPulseCrimson {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 51, 51, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 51, 51, 0.5);
+  }
+}
+
+/* Cyber Telemetry Scan line effect */
+@keyframes radarSweep {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Animation Helpers
+   -------------------------------------------------------------------------- */
+
+/* General staggered entry animation */
+.animate-cascade {
+  opacity: 0;
+  animation: slideDownFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Stagger Delay Classes (0.1s step increments for premium UI reveal) */
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+.delay-6 { animation-delay: 0.6s; }
+.delay-7 { animation-delay: 0.7s; }
+.delay-8 { animation-delay: 0.8s; }
+
+/* Status Pulsers */
+.pulse-glow-green {
+  animation: neonPulseGreen 2.5s infinite ease-in-out;
+}
+
+.pulse-glow-amber {
+  animation: neonPulseAmber 2.5s infinite ease-in-out;
+}
+
+.pulse-glow-crimson {
+  animation: neonPulseCrimson 2.5s infinite ease-in-out;
+}
+
+/* Scanning scanline utility */
+.radar-scan-line {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-success), transparent);
+  opacity: 0.2;
+  pointer-events: none;
+  animation: radarSweep 4s infinite linear;
+}

@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import Navbar from './components/Navbar';
+import Sidebar from './components/layout/Sidebar';
+import DashboardOverview from './components/dashboard/DashboardOverview';
+import PolicyUploader from './components/policy/PolicyUploader';
+import ActivePolicies from './components/policy/ActivePolicies';
+import AgenticBrain from './components/timeline/AgenticBrain';
+import DomainWhitelist from './components/whitelist/DomainWhitelist';
+import InterceptionLogs from './components/logs/InterceptionLogs';
+import SpoofingAlerts from './components/alerts/SpoofingAlerts';
+import DashboardReports from './components/reports/Reports';
+import DashboardSettings from './components/settings/Settings';
 import DashboardGrid from './components/DashboardGrid';
 import Assets from './pages/Assets';
 import ScanHistory from './pages/ScanHistory';
@@ -79,6 +87,121 @@ function DashboardShell({ children }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   CommandCenter
+   Main operations center utilizing tab-based view switching and shared states.
+────────────────────────────────────────────────────────────────────────────── */
+function CommandCenter() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const toggleSidebar = () => setSidebarOpen((p) => !p);
+
+  // Lifted policies state
+  const [policies, setPolicies] = useState([
+    { id: 'pol-1', title: 'GDPR Data Compliance guidelines', category: 'GDPR PII', chunks: 42, date: '07/20/2026', enabled: true },
+    { id: 'pol-2', title: 'AWS Secret Token Intercepts', category: 'Financial Security', chunks: 28, date: '07/21/2026', enabled: true },
+    { id: 'pol-3', title: 'OAuth Whitelist Exclusions', category: 'General Exclusion', chunks: 14, date: '07/23/2026', enabled: false }
+  ]);
+
+  // Lifted threat logs state
+  const [threatLogs, setThreatLogs] = useState([
+    { id: 'tlog-1', domain: 'api.openai.com/v1/chat', type: 'OpenAI API Key', action: 'Synthetic Decoy Deployed', status: 'success', time: '11:32:04' },
+    { id: 'tlog-2', domain: 'slack.com/api/files.upload', type: 'Corporate SSH Private Key', action: 'Synthetic Decoy Deployed', status: 'success', time: '11:28:15' },
+    { id: 'tlog-3', domain: 'github.com/api/v3', type: 'Admin OAuth Credentials', action: 'Interception Block Triggered', status: 'failed', time: '11:15:42' },
+    { id: 'tlog-4', domain: 'internal.sandbox-dev.net', type: 'Database Query Payload', action: 'Whitelisted Bypass Code', status: 'warning', time: '11:02:11' },
+    { id: 'tlog-5', domain: 'huggingface.co/api/models', type: 'Production Secret Token', action: 'Synthetic Decoy Deployed', status: 'success', time: '10:58:30' }
+  ]);
+
+  const handleTogglePolicy = (id) => {
+    setPolicies((prev) =>
+      prev.map((policy) =>
+        policy.id === id ? { ...policy, enabled: !policy.enabled } : policy
+      )
+    );
+  };
+
+  const handleDeletePolicy = (id) => {
+    setPolicies((prev) => prev.filter((policy) => policy.id !== id));
+  };
+
+  const handleUploadSuccess = (newPolicy) => {
+    setPolicies((prev) => [newPolicy, ...prev]);
+  };
+
+  const renderActiveView = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <DashboardOverview
+            policies={policies}
+            threatLogs={threatLogs}
+            onTogglePolicy={handleTogglePolicy}
+            onDeletePolicy={handleDeletePolicy}
+            onUploadSuccess={handleUploadSuccess}
+          />
+        );
+      case 'policy':
+        return (
+          <div className="w-full max-w-5xl mx-auto p-4 flex flex-col gap-6">
+            <PolicyUploader onUploadSuccess={handleUploadSuccess} />
+            <ActivePolicies
+              policies={policies}
+              onToggle={handleTogglePolicy}
+              onDelete={handleDeletePolicy}
+            />
+          </div>
+        );
+      case 'brain':
+        return <AgenticBrain />;
+      case 'whitelist':
+        return <DomainWhitelist />;
+      case 'logs':
+        return <InterceptionLogs />;
+      case 'alerts':
+        return <SpoofingAlerts />;
+      case 'reports':
+        return <DashboardReports />;
+      case 'settings':
+        return <DashboardSettings />;
+      default:
+        return <div className="p-4 text-center font-mono">View Not Found</div>;
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen bg-[#0a0d14] text-slate-100 overflow-x-hidden">
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isOpen={sidebarOpen}
+        toggleSidebar={toggleSidebar}
+      />
+      <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
+        {/* Simple navbar containing a toggle button for mobile views */}
+        <header className="flex items-center justify-between px-6 py-4 bg-[#0a0d14] border-b border-white/5 md:justify-end select-none shrink-0">
+          <button
+            onClick={toggleSidebar}
+            className="p-2 rounded bg-white/5 border border-white/10 text-gray-400 md:hidden hover:bg-white/10 active:scale-95 transition-all"
+            aria-label="Toggle Sidebar"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-success)] pulse-glow-green" />
+            <span className="text-gray-400">ENGINE STATUS: <span className="text-white font-bold">ONLINE</span></span>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto bg-[#0a0d14] scrollbar-thin">
+          {renderActiveView()}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    App
 ────────────────────────────────────────────────────────────────────────────── */
 export default function App() {
@@ -108,9 +231,7 @@ export default function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <DashboardShell>
-                  <DashboardGrid />
-                </DashboardShell>
+                <CommandCenter />
               </ProtectedRoute>
             }
           />
