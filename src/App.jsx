@@ -14,6 +14,7 @@ import DashboardGrid from './components/DashboardGrid';
 import LlmShield from './components/features/LlmShield';
 import ImageRedaction from './components/features/ImageRedaction';
 import DecoySwapper from './components/features/DecoySwapper';
+import ShieldStatusBar from './components/common/ShieldStatusBar';
 import Assets from './pages/Assets';
 import ScanHistory from './pages/ScanHistory';
 import Reports from './pages/Reports';
@@ -196,9 +197,12 @@ function CommandCenter() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-success)] pulse-glow-green" />
-            <span className="text-gray-400">ENGINE STATUS: <span className="text-white font-bold">ONLINE</span></span>
+          <div className="flex items-center gap-4">
+            <ShieldStatusBar />
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-[var(--color-success)] pulse-glow-green" />
+              <span className="text-gray-400">ENGINE STATUS: <span className="text-white font-bold">ONLINE</span></span>
+            </div>
           </div>
         </header>
 

@@ -1,6 +1,6 @@
 /**
  * interceptor.js - SafeLens Ultimate (Maximum PII Shield Engine + Contextual AI Rules)
- * Updated: Hybrid Architecture with Localhost FastAPI OpenCV Redaction Engine.
+ * Updated: Extension ↔ Dashboard Message Bridge Listener Added.
  */
 
 (function () {
@@ -20,6 +20,62 @@
   window.SAFELENS_PAUSED = false;
   window.SAFELENS_PAUSE_UNTIL = null;
 
+  // ==========================================
+  // DASHBOARD ↔ EXTENSION BRIDGE LISTENER
+  // ==========================================
+  function broadcastStatusToPage() {
+    window.postMessage({
+      direction: 'from-content-script',
+      type: 'SAFELENS_STATUS_RESPONSE',
+      payload: {
+        extensionPaused: window.SAFELENS_PAUSED,
+        pauseUntilTimestamp: window.SAFELENS_PAUSE_UNTIL,
+        whitelist: DYNAMIC_WHITELIST
+      }
+    }, '*');
+  }
+
+  window.addEventListener('message', (event) => {
+    if (event.source === window && event.data && event.data.direction === 'from-page-script') {
+
+      if (event.data.type === 'SAFELENS_TOGGLE_STATE') {
+        const isPaused = !!event.data.payload?.extensionPaused;
+        const pauseUntil = event.data.payload?.pauseUntilTimestamp || null;
+        window.SAFELENS_PAUSED = isPaused;
+        window.SAFELENS_PAUSE_UNTIL = isPaused ? pauseUntil : null;
+
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ extensionPaused: isPaused, pauseUntilTimestamp: isPaused ? pauseUntil : null }, () => {
+            console.log(`%c[${EXT_NAME}] 🔄 Protection State Synced from Dashboard: ${isPaused ? 'PAUSED' : 'ACTIVE'}`, 'color: #00ffff; font-weight: bold;');
+            broadcastStatusToPage();
+          });
+        } else {
+          broadcastStatusToPage();
+        }
+      }
+
+      // Dashboard asking "what's the current shield status?" (used on mount / reconnect)
+      if (event.data.type === 'SAFELENS_STATUS_REQUEST') {
+        broadcastStatusToPage();
+      }
+
+      // Dashboard adding a domain to the trusted whitelist
+      if (event.data.type === 'SAFELENS_WHITELIST_ADD') {
+        const domain = (event.data.payload?.domain || '').trim().toLowerCase();
+        if (domain) {
+          DYNAMIC_WHITELIST = Array.from(new Set([...DYNAMIC_WHITELIST, domain]));
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ customWhitelist: DYNAMIC_WHITELIST }, () => {
+              broadcastStatusToPage();
+            });
+          } else {
+            broadcastStatusToPage();
+          }
+        }
+      }
+    }
+  });
+
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['customWhitelist', 'extensionPaused', 'pauseUntilTimestamp'], (result) => {
       if (result.customWhitelist && Array.isArray(result.customWhitelist)) {
@@ -31,6 +87,8 @@
       if (result.pauseUntilTimestamp) {
         window.SAFELENS_PAUSE_UNTIL = result.pauseUntilTimestamp;
       }
+      // Let the dashboard (if it's this page) know the initial state right away
+      broadcastStatusToPage();
     });
 
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -43,6 +101,10 @@
         }
         if (changes.pauseUntilTimestamp !== undefined) {
           window.SAFELENS_PAUSE_UNTIL = changes.pauseUntilTimestamp.newValue || null;
+        }
+        // Any relevant storage change → tell the dashboard immediately (no refresh needed)
+        if (changes.customWhitelist || changes.extensionPaused !== undefined || changes.pauseUntilTimestamp !== undefined) {
+          broadcastStatusToPage();
         }
       }
     });
@@ -57,6 +119,7 @@
         chrome.storage.local.set({ extensionPaused: false, pauseUntilTimestamp: null });
       }
       notifyUser('SafeLens AI Shield Reactivated!', 'success');
+      broadcastStatusToPage();
       return false;
     }
     return true;
@@ -110,9 +173,6 @@
     }
   }
 
-  // ==========================================
-  // TEXT REDACTION REGEX & HYDRATION LOGIC
-  // ==========================================
   function createRegexes() {
     return {
       AADHAAR: /(?:^|[^\d])([2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4})(?:[^\d]|$)/g,
@@ -152,7 +212,6 @@
       return realistic;
     };
 
-    // PASS 1: Replace matches with unique placeholders
     let pass1 = text
       .replace(r.CREDIT_CARD, (m, g1) => m.replace(g1, '__CARD_PH__'))
       .replace(r.AADHAAR, (m, g1) => m.replace(g1, '__AADHAAR_PH__'))
@@ -171,7 +230,6 @@
       .replace(r.PRIVATE_KEY, () => '__PRIVATE_KEY_PH__')
       .replace(r.PASSWORD_SECRET, (m, g1) => m.replace(g1, '__PASSWORD_SECRET_PH__'));
 
-    // PASS 2: Replace placeholders with realistic decoys or static tags
     return pass1
       .replace(/__CARD_PH__/g, getDecoy("4532 0154 9876 5558", '[REDACTED_CARD]'))
       .replace(/__AADHAAR_PH__/g, getDecoy("9876 5432 1090", '[Aadhaar Redacted]'))
@@ -376,7 +434,7 @@
       if (tag === 'button' || role === 'button' || tag === 'svg' || tag === 'path' || tag === 'div' || tag === 'span') {
         if (/send|submit|grok|search/i.test(ariaLabel) || /send|submit/i.test(dataTestId)) return current;
         if (lowerClass.includes('send') || lowerClass.includes('submit') || lowerId.includes('send') || lowerId.includes('submit')) return current;
-        
+
         const form = current.closest ? current.closest('form') : null;
         if (form) {
           const hasInput = form.querySelector('textarea, [contenteditable="true"]');
@@ -437,8 +495,7 @@
   async function executeFinalSubmission(inputEl, sendBtn) {
     hideOverlay();
     if (inputEl) inputEl.style.opacity = '1';
-    
-    // 1. Give React's Virtual DOM time to sync before clicking to avoid Error 418/404
+
     await new Promise(r => setTimeout(r, 250));
 
     const freshBtn = findSendButton();
@@ -452,10 +509,8 @@
         await new Promise(r => setTimeout(r, 250));
         metaEditor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, composed: true }));
       } else if (liveBtn && typeof liveBtn.click === 'function' && !liveBtn.disabled) {
-        // 2. Clean click if button is naturally enabled
         liveBtn.click();
       } else if (inputEl) {
-        // 3. Clean fallback to Enter key (No aggressive keypress sequence)
         inputEl.focus();
         inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, composed: true }));
       }
@@ -576,10 +631,6 @@
     }
   }
 
-  // ==========================================
-  // 🚀 FASTAPI OPENCV IMAGE REDACTION ENGINE & BACKGROUND BRIDGE
-  // ==========================================
-
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -610,7 +661,6 @@
     try {
       const base64Data = await fileToBase64(file);
 
-      // Route 1: Background Service Worker (Bypasses HTTPS Mixed-Content & CORS Restrictions)
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
         const response = await new Promise((resolve) => {
           const timeoutTimer = setTimeout(() => {
@@ -639,7 +689,6 @@
         }
       }
 
-      // Route 2: Direct Fetch Fallback
       console.log(`[SafeLens Engine] Attempting direct fetch fallback to http://127.0.0.1:8000/api/process-image...`);
       const formData = new FormData();
       formData.append('file', file, fileName);
@@ -671,7 +720,6 @@
       } else if (redactedStatus === 'CLEAN' || piiCountHeader === '0') {
         isRedacted = false;
       } else {
-        // Fallback if headers are not present
         if (outName.startsWith('redacted_')) {
           isRedacted = true;
         } else if (!contentDisposition) {
@@ -740,7 +788,7 @@
       const hiddenInputs = [];
       const originalNames = new Map();
       const allElements = form.querySelectorAll('input, textarea, select');
-      
+
       allElements.forEach(el => {
         if (el.type === 'file') return;
         if (el.hasAttribute('name')) {
@@ -789,9 +837,6 @@
     }
   }
 
-  // ==========================================
-  // EVENT LISTENERS BINDING (CAPTURE PHASE & SYNCHRONOUS BUFFER EXTRACTION)
-  // ==========================================
   function initInterceptors() {
     document.addEventListener('keydown', handleKeydownEvent, { capture: true, passive: false });
     document.addEventListener('keypress', handleKeyupAndPress, { capture: true, passive: false });
@@ -801,7 +846,6 @@
     document.addEventListener('click', handlePointerClickEvent, { capture: true, passive: false });
     document.addEventListener('submit', handleFormSubmit, { capture: true, passive: false });
 
-    // 1. File Input (Change Event)
     document.addEventListener('change', (e) => {
       const target = e.target;
       if (!target || target.tagName !== 'INPUT' || target.type !== 'file') return;
@@ -819,9 +863,7 @@
 
       const originalFile = files[0];
       console.log(`%c[SafeLens Engine] ⚡ CHANGE event captured synchronously on <input type="file">`, 'color: #00ffff; font-weight: bold; background: #002b36; padding: 2px 5px;');
-      console.log(`%c[SafeLens Engine] 📄 File: ${originalFile.name} | Size: ${(originalFile.size / 1024).toFixed(1)} KB | Type: ${originalFile.type}`, 'color: #00ff00;');
 
-      // SYNCHRONOUS INTERCEPTION BEFORE WEBSITE READS UNREDACTED FILE
       e.preventDefault();
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -861,7 +903,6 @@
       })();
     }, { capture: true, passive: false });
 
-    // 2. Clipboard Paste Interception
     document.addEventListener('paste', (e) => {
       if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href)) return;
 
@@ -875,7 +916,6 @@
         return;
       }
 
-      // SYNCHRONOUS CLIPBOARD EXTRACTION BEFORE ASYNC TICK / EVENT EXPIRATION
       const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
       if (!clipboardData || !clipboardData.items) return;
 
@@ -890,10 +930,6 @@
 
       if (!imageFile) return;
 
-      console.log(`%c[SafeLens Engine] ⚡ PASTE event captured synchronously`, 'color: #00ffff; font-weight: bold; background: #002b36; padding: 2px 5px;');
-      console.log(`%c[SafeLens Engine] 📄 Extracted Pasted Image: ${imageFile.name || 'clipboard_image.png'} | Size: ${(imageFile.size / 1024).toFixed(1)} KB | Type: ${imageFile.type}`, 'color: #00ff00;');
-
-      // SYNCHRONOUS STOP ELIMINATES ORIGINAL UNREDACTED CLIPBOARD PROPAGATION
       e.preventDefault();
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -938,7 +974,6 @@
       })();
     }, { capture: true, passive: false });
 
-    // 3. Drag-and-Drop Interception (DragOver & DragEnter enabled)
     document.addEventListener('dragover', (e) => {
       if (window.SAFELENS_PAUSED || isDomainWhitelisted(window.location.href)) return;
       const types = e.dataTransfer?.types;
@@ -968,15 +1003,11 @@
         return;
       }
 
-      // SYNCHRONOUS DATATRANSFER EXTRACTION BEFORE ASYNC TICK / EVENT EXPIRATION
       const files = e.dataTransfer?.files;
       if (!files || files.length === 0 || !files[0].type.startsWith('image/')) return;
 
       const droppedFile = files[0];
-      console.log(`%c[SafeLens Engine] ⚡ DROP event captured synchronously`, 'color: #00ffff; font-weight: bold; background: #002b36; padding: 2px 5px;');
-      console.log(`%c[SafeLens Engine] 📄 Extracted Dropped Image: ${droppedFile.name} | Size: ${(droppedFile.size / 1024).toFixed(1)} KB | Type: ${droppedFile.type}`, 'color: #00ff00;');
 
-      // SYNCHRONOUS STOP ELIMINATES ORIGINAL UNREDACTED DROP PROPAGATION
       e.preventDefault();
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
