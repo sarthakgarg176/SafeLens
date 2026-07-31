@@ -1,411 +1,396 @@
-/**
- * SafeLens 2.0 API Client
- * Manages REST communication with local API service.
- * Supports fallback to mock/simulated vectors when the backend is unreachable.
- */
+// services/api.js
+// Unified backend connector for SafeLens dashboard.
+// Talks to the real FastAPI backend's Unified Incidents Engine (GET /api/incidents)
+// and the Image OCR Pipeline (POST /api/process-image), with instant localStorage
+// fallback so the UI never blocks on Render's cold-start.
 
-const BASE_URL = 'http://localhost:8000';
-const INCIDENTS_CACHE_KEY = 'ps_incidents';
+const BASE_URL = 'https://safelens-zttx.onrender.com';
+const INCIDENTS_ENDPOINT = `${BASE_URL}/api/incidents`;
+const PROCESS_IMAGE_ENDPOINT = `${BASE_URL}/api/process-image`;
+const LOCAL_STORAGE_KEY = 'ps_incidents';
 
-/**
- * Helper to check headers with session token authorization
- * @returns {Object} Request headers
- */
-function getHeaders(isMultipart = false) {
-  const token = localStorage.getItem('cloakai_session_token') || '';
-  const headers = {};
-
-  if (!isMultipart) {
-    headers['Content-Type'] = 'application/json';
-  }
-  headers['Accept'] = 'application/json';
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
-
-/**
- * Upload an enterprise policy brief (.pdf, .html) to the backend uploader.
- * Fallbacks to simulated compliance rules if backend server is offline.
- *
- * @param {File} file - PDF or HTML file object
- * @returns {Promise<Object>} Ingestion response
- */
-export async function uploadPolicyDocument(file) {
-  const url = `${BASE_URL}/api/v1/policy/upload`;
-  const formData = new FormData();
-  formData.append('file', file);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: getHeaders(true),
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error(`Upload HTTP error: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.warn('[api.js] Backend unreachable. Simulating policy ingestion upload trace:', error);
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const extension = file.name.split('.').pop().toLowerCase();
-    return {
-      status: 'success',
-      filename: file.name,
-      policy_id: `policy-${Date.now()}`,
-      chunks: Math.floor(Math.random() * 30) + 15,
-      category: extension === 'pdf' ? 'GDPR PII' : 'Compliance Spec',
-      date: new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    };
-  }
-}
-
-/**
- * Fetch all active vector policies indexed inside ChromaDB.
- * Fallbacks to standard pre-populated compliance matrices if backend is unreachable.
- *
- * @returns {Promise<Array>} List of policy objects
- */
-export async function fetchActivePolicies() {
-  const url = `${BASE_URL}/api/v1/policy/list`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getHeaders()
-    });
-
-    if (!response.ok) {
-      throw new Error(`Fetch policies HTTP error: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.warn('[api.js] Backend unreachable. Fallback to active compliance policies list:', error);
-
-    return [
-      {
-        id: 'pol-1',
-        title: 'GDPR Data Compliance guidelines',
-        category: 'GDPR PII',
-        chunks: 42,
-        date: '07/20/2026',
-        enabled: true
-      },
-      {
-        id: 'pol-2',
-        title: 'AWS Secret Token Intercepts',
-        category: 'Financial Security',
-        chunks: 28,
-        date: '07/21/2026',
-        enabled: true
-      },
-      {
-        id: 'pol-3',
-        title: 'OAuth Whitelist Exclusions',
-        category: 'General Exclusion',
-        chunks: 14,
-        date: '07/23/2026',
-        enabled: false
-      }
-    ];
-  }
-}
-
-/**
- * Fetch active services node health (Ollama, ChromaDB, and Backend API).
- * Fallbacks to online statuses if backend is unreachable.
- *
- * @returns {Promise<Object>} Services health flags object
- */
-export async function fetchSystemHealth() {
-  const url = `${BASE_URL}/api/v1/health`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getHeaders()
-    });
-
-    if (!response.ok) {
-      throw new Error(`Fetch health HTTP error: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.warn('[api.js] Backend unreachable. Mocking online status profiles:', error);
-
-    return {
-      status: 'online',
-      services: {
-        ollama: { status: 'online', model: 'llama-3-privacy:8b' },
-        chromadb: { status: 'online', active_rules: 8 },
-        api: { status: 'online', version: 'v2.0' }
-      }
-    };
-  }
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   NEW: Unified Incidents Engine (LLM Shield + Decoy Swapper)
-   Real endpoint per Sahil: GET /api/incidents
-──────────────────────────────────────────────────────────────────────── */
-
-const MOCK_INCIDENTS = [
-  {
-    id: 'SCAN-9021',
-    date: 'Jul 30, 13:42:05',
-    vector: 'api.openai.com/v1/chat',
-    url: 'PII / Credentials',
-    severity: 'high',
-    status: 'Resolved',
-    metadata: {
-      originalPayload: '{\n  "prompt": "My key is sk-live-4f9a8c2e, debug this API call"\n}',
-      decoyPayload: '{\n  "prompt": "My key is sk-fake-8e21x93z, debug this API call"\n}'
-    }
-  },
-  {
-    id: 'SCAN-9022',
-    date: 'Jul 30, 13:39:51',
-    vector: 'claude.ai',
-    url: 'Password',
-    severity: 'high',
-    status: 'Resolved',
-    metadata: {
-      originalPayload: '{\n  "prompt": "here is my password hunter2024!"\n}',
-      decoyPayload: '{\n  "prompt": "here is my password [REDACTED_DECOY]"\n}'
-    }
-  },
-  {
-    id: 'SCAN-9023',
-    date: 'Jul 30, 13:31:07',
-    vector: 'gemini.google.com',
-    url: 'Credit Card',
-    severity: 'medium',
-    status: 'Audit',
-    metadata: {}
-  },
-  {
-    id: 'SCAN-9024',
-    date: 'Jul 29, 19:12:30',
-    vector: 'secure-paypal-login.ru',
-    url: 'Payment Phishing',
-    severity: 'high',
-    status: 'Escalated',
-    metadata: { decoyPayload: 'Luhn-compliant fake card injected' }
-  },
-  {
-    id: 'SCAN-9025',
-    date: 'Jul 29, 18:04:11',
-    vector: 'aadhaar-kyc-verify.xyz',
-    url: 'ID Phishing',
-    severity: 'high',
-    status: 'Resolved',
-    metadata: { decoyPayload: 'Verhoeff-compliant fake Aadhaar injected' }
-  },
-  {
-    id: 'SCAN-9026',
-    date: 'Jul 29, 16:47:58',
-    vector: 'bank-update-portal.top',
-    url: 'Credential Phishing',
-    severity: 'medium',
-    status: 'Resolved',
-    metadata: { decoyPayload: 'Luhn-compliant fake card injected' }
-  }
+// Known LLM API hosts used to classify an incident's vector as an "LLM Shield" catch.
+// Extend this list as you wire up more providers.
+const KNOWN_LLM_HOSTS = [
+  'api.openai.com',
+  'api.anthropic.com',
+  'generativelanguage.googleapis.com', // Gemini
+  'api.groq.com',
 ];
 
-/** Known LLM / AI-provider host fragments used to split the unified feed. */
-const LLM_HOST_HINTS = ['openai', 'claude', 'anthropic', 'gemini', 'huggingface', 'github.com/api', 'slack.com/api'];
+// ---------------------------------------------------------------------------
+// Low-level helpers
+// ---------------------------------------------------------------------------
 
-/**
- * Classify a unified incident as an LLM Shield event or a Decoy Swapper event.
- * @param {Object} incident
- * @returns {'llm'|'decoy'}
- */
-export function classifyIncident(incident) {
-  const vector = (incident.vector || '').toLowerCase();
-  return LLM_HOST_HINTS.some((hint) => vector.includes(hint)) ? 'llm' : 'decoy';
+function readLocalIncidents() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.warn('[api] Failed to read ps_incidents from localStorage:', err);
+    return [];
+  }
+}
+
+function writeLocalIncidents(incidents) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(incidents));
+  } catch (err) {
+    console.warn('[api] Failed to write ps_incidents to localStorage:', err);
+  }
 }
 
 /**
- * Map backend status ('Escalated'|'Resolved'|'Audit') to a StatusBadge tone.
- * @param {string} status
- * @returns {'success'|'warning'|'failed'}
+ * getIncidents
+ * Fetches the unified incidents array from the real backend.
+ * On failure (e.g. Render cold-start timeout, network error), instantly
+ * falls back to whatever is cached in localStorage under `ps_incidents`,
+ * so the UI still renders in <500ms instead of hanging.
  */
-export function statusToTone(status) {
-  if (status === 'Escalated') return 'failed';
-  if (status === 'Resolved') return 'success';
-  return 'warning'; // Audit / unknown
+export async function getIncidents({ timeoutMs = 6000 } = {}) {
+  const cached = readLocalIncidents();
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch(INCIDENTS_ENDPOINT, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!res.ok) throw new Error(`Incidents fetch failed: ${res.status}`);
+
+    const incidents = await res.json();
+    writeLocalIncidents(incidents); // refresh cache for next cold-start
+    return { incidents, source: 'live' };
+  } catch (err) {
+    console.warn('[api] /api/incidents unreachable, using local cache:', err.message);
+    return { incidents: cached, source: 'cache' };
+  }
 }
 
 /**
- * Derive a human-readable decoy action label from an incident's category text.
- * @param {Object} incident
- * @returns {string}
+ * getCachedIncidentsInstant
+ * Synchronous read for the very first paint (e.g. to pre-populate state
+ * before the async fetch resolves), so the dashboard never shows a blank
+ * loading screen if we already have something locally.
  */
-export function decoyActionLabel(incident) {
-  const cat = (incident.url || '').toLowerCase();
-  if (cat.includes('aadhaar') || cat.includes('id ')) return 'Aadhaar Decoy Injected';
-  if (cat.includes('card') || cat.includes('payment') || cat.includes('credit')) return 'Card Decoy Injected';
-  return 'Synthetic Decoy Injected';
+export function getCachedIncidentsInstant() {
+  return readLocalIncidents();
 }
 
 /**
- * Synchronously read the last cached incidents list from localStorage.
- * Use this for instant first paint before the network call resolves.
- * @returns {Array|null}
+ * getCachedIncidents
+ * Alias expected by components that read the cache directly (e.g. the
+ * current LlmShield.jsx). Returns null when nothing is cached yet, so
+ * callers can distinguish "no cache" from "cache is an empty array".
  */
 export function getCachedIncidents() {
-  try {
-    const raw = localStorage.getItem(INCIDENTS_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  const cached = readLocalIncidents();
+  return cached && cached.length ? cached : null;
 }
 
 /**
- * Fetch the unified incidents feed (LLM interceptions + decoy swaps).
- * Caches successful responses to localStorage (`ps_incidents`) for instant
- * loads next time, and falls back to that cache (or demo data) if the
- * backend is unreachable / cold-starting.
- *
- * @returns {Promise<Array>} List of incident objects
+ * fetchIncidents
+ * Flat version of getIncidents() for components that just want the array
+ * directly (not wrapped in { incidents, source }). Severity is normalized
+ * here at the source, so every consumer can safely check
+ * `incident.severity === 'high'` without knowing about backend variants
+ * like "serious" or "critical".
  */
 export async function fetchIncidents() {
-  const url = `${BASE_URL}/api/incidents`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getHeaders()
-    });
-
-    if (!response.ok) {
-      throw new Error(`Fetch incidents HTTP error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    try {
-      localStorage.setItem(INCIDENTS_CACHE_KEY, JSON.stringify(data));
-    } catch {
-      // localStorage full/unavailable — non-fatal
-    }
-
-    return data;
-  } catch (error) {
-    console.warn('[api.js] Backend unreachable/cold-starting. Falling back to cached or demo incidents:', error);
-
-    const cached = getCachedIncidents();
-    return cached || MOCK_INCIDENTS;
-  }
+  const { incidents } = await getIncidents();
+  return incidents.map((i) => ({ ...i, severity: normalizeSeverity(i.severity) }));
 }
 
 /**
- * Fetch the real assets list (uploaded/processed files) to power Image
- * Redaction's stats with genuine backend data.
- * Confirmed working endpoint: GET /api/assets
- *
- * @returns {Promise<Object>} { imagesScanned, piiElementsFound, recentAssets: [] }
+ * classifyIncident
+ * Public version of the classification logic below, returning a plain
+ * string so components can filter directly: 'llm' | 'decoy' | 'image'.
  */
-export async function fetchAssetsSummary() {
-  const url = `${BASE_URL}/api/assets`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getHeaders()
-    });
-
-    if (!response.ok) {
-      throw new Error(`Fetch assets HTTP error: ${response.status}`);
-    }
-
-    const { data } = await response.json();
-    const assets = Array.isArray(data) ? data : [];
-
-    return {
-      imagesScanned: assets.length,
-      piiElementsFound: assets.filter((a) => a.status === 'Redacted').length,
-      recentAssets: assets.slice(-5).reverse()
-    };
-  } catch (error) {
-    console.warn('[api.js] Backend unreachable. Falling back to demo asset summary:', error);
-    return {
-      imagesScanned: 212,
-      piiElementsFound: 58,
-      recentAssets: []
-    };
-  }
+export function classifyIncident(incident) {
+  if (isImageIncident(incident)) return 'image';
+  if (isLlmIncident(incident)) return 'llm';
+  return 'decoy';
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   NEW: Image Redaction / OCR pipeline
-   Real endpoint per Sahil: POST /api/process-image
-   Reads X-PII-Count / X-Redacted-Status response headers + boundingBoxes body
-──────────────────────────────────────────────────────────────────────── */
-
-const DEMO_IMAGE_RESULT = {
-  status: 'REDACTED',
-  piiCount: 3,
-  boundingBoxes: [
-    { x: 20, y: 30, w: 90, h: 16 },
-    { x: 20, y: 60, w: 130, h: 16 },
-    { x: 160, y: 30, w: 70, h: 16 }
-  ],
-  latencyMs: 398,
-  dimensions: '1080x720'
+/**
+ * statusToTone
+ * Maps the backend's raw status strings to the tone prop StatusBadge
+ * expects. Adjust the map below if StatusBadge.jsx uses different tone
+ * names than danger/warning/success/info.
+ */
+const STATUS_TONE_MAP = {
+  open: 'danger',
+  escalated: 'danger',
+  resolved: 'success',
+  audit: 'info',
 };
 
+export function statusToTone(status) {
+  const key = (status ?? '').toLowerCase().trim();
+  return STATUS_TONE_MAP[key] ?? 'info';
+}
+
 /**
- * Upload an image for OCR + redaction.
- * Falls back to demo bounding boxes if backend is unreachable.
- *
- * @param {File} file - Image file object
- * @returns {Promise<Object>} { status, piiCount, boundingBoxes, latencyMs, dimensions }
+ * decoyActionLabel
+ * Human-readable action label for the Decoy Swapper's "Flagged Sites" table.
+ * If a decoy was actually generated for this incident, say so explicitly;
+ * otherwise fall back to whatever status the backend reported.
+ */
+export function decoyActionLabel(incident) {
+  if (incident?.metadata?.decoyPayload) return 'decoy served';
+  return (incident?.status || 'pending').toLowerCase();
+}
+
+/**
+ * readImageDimensions
+ * Fallback used when the backend response doesn't include a `dimensions`
+ * field — reads the actual uploaded file's natural width/height in-browser.
+ */
+function readImageDimensions(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(`${img.naturalWidth}x${img.naturalHeight}`);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve('N/A');
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * processImage
+ * Uploads an image to the Image Redaction & OCR pipeline.
+ * Reads X-PII-Count / X-Redacted-Status response headers as specified,
+ * in addition to the JSON body (status, piiCount, boundingBoxes).
  */
 export async function processImage(file) {
-  const url = `${BASE_URL}/api/process-image`;
   const formData = new FormData();
   formData.append('file', file);
+
   const startedAt = performance.now();
+  const res = await fetch(PROCESS_IMAGE_ENDPOINT, {
+    method: 'POST',
+    body: formData,
+  });
+  const latencyMs = Math.round(performance.now() - startedAt);
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: getHeaders(true),
-      body: formData
-    });
+  if (!res.ok) throw new Error(`process-image failed: ${res.status}`);
 
-    if (!response.ok) {
-      throw new Error(`Process image HTTP error: ${response.status}`);
-    }
+  const piiCountHeader = res.headers.get('X-PII-Count');
+  const redactedStatusHeader = res.headers.get('X-Redacted-Status');
+  const body = await res.json(); // { status, piiCount, boundingBoxes }
 
-    const piiCountHeader = response.headers.get('X-PII-Count');
-    const redactedStatusHeader = response.headers.get('X-Redacted-Status');
-    const body = await response.json().catch(() => ({}));
+  const result = {
+    status: redactedStatusHeader ?? body.status,
+    piiCount: piiCountHeader != null ? Number(piiCountHeader) : body.piiCount,
+    boundingBoxes: body.boundingBoxes ?? [],
+    latencyMs,
+    dimensions: body.dimensions ?? (await readImageDimensions(file)),
+  };
 
-    return {
-      status: redactedStatusHeader || body.status || 'REDACTED',
-      piiCount: piiCountHeader !== null ? Number(piiCountHeader) : (body.piiCount ?? 0),
-      boundingBoxes: body.boundingBoxes || [],
-      latencyMs: Math.round(performance.now() - startedAt),
-      dimensions: body.dimensions || '—'
-    };
-  } catch (error) {
-    console.warn('[api.js] Backend unreachable. Falling back to demo image redaction result:', error);
-    return DEMO_IMAGE_RESULT;
-  }
+  // Optimistically fold this into the local incidents cache too, so a
+  // refresh immediately reflects the new scan even before /api/incidents
+  // has been re-fetched from the server.
+  const cached = readLocalIncidents();
+  writeLocalIncidents([
+    {
+      id: `SCAN-${Date.now()}`,
+      date: new Date().toLocaleString('en-US', {
+        month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+      }),
+      vector: file.name,
+      url: 'Image PII',
+      severity: result.piiCount > 0 ? 'high' : 'safe',
+      status: result.status === 'REDACTED' ? 'Resolved' : 'Audit',
+      metadata: {
+        status: result.status,
+        piiCount: result.piiCount,
+        boundingBoxes: result.boundingBoxes,
+      },
+    },
+    ...cached,
+  ]);
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Classification
+// ---------------------------------------------------------------------------
+// Real-world incidents don't reliably carry an LLM-provider-looking vector
+// (e.g. vector can be "Government ID" or a plain upload URL). The reliable
+// signal is the *payload content* itself: LLM Shield catches always carry a
+// prompt-shaped originalPayload/decoyPayload. Hostname matching is kept only
+// as a secondary fallback signal.
+
+function isImageIncident(incident) {
+  return Boolean(incident?.metadata?.boundingBoxes);
+}
+
+function hasPromptSignal(incident) {
+  const original = incident?.metadata?.originalPayload ?? '';
+  const decoy = incident?.metadata?.decoyPayload ?? '';
+  return original.includes('"prompt"') || decoy.includes('"prompt"');
+}
+
+function matchesKnownLlmHost(incident) {
+  const vector = incident?.vector ?? '';
+  return KNOWN_LLM_HOSTS.some((host) => vector.includes(host));
+}
+
+function isLlmIncident(incident) {
+  if (isImageIncident(incident)) return false;
+  return hasPromptSignal(incident) || matchesKnownLlmHost(incident);
+}
+
+function isDecoyIncident(incident) {
+  return !isImageIncident(incident) && !isLlmIncident(incident);
+}
+
+// Backend severity strings aren't fully standardized yet ("serious" shows up
+// alongside "high"/"medium"/"safe"). Normalize everything down to a 3-value
+// scale so KPI counts (e.g. "High Severity") stay accurate regardless of
+// which exact word the backend sends.
+const SEVERITY_MAP = {
+  high: 'high',
+  serious: 'high',
+  critical: 'high',
+  medium: 'medium',
+  moderate: 'medium',
+  safe: 'safe',
+  low: 'safe',
+  resolved: 'safe',
+};
+
+export function normalizeSeverity(rawSeverity) {
+  const key = (rawSeverity ?? '').toLowerCase().trim();
+  return SEVERITY_MAP[key] ?? 'medium';
+}
+
+/**
+ * getSeverityCounts
+ * Handy for an overview/home dashboard that shows "High/Medium/Safe" tiles
+ * across ALL incidents (LLM + Decoy + Image combined).
+ */
+export function getSeverityCounts(incidents) {
+  return incidents.reduce(
+    (acc, i) => {
+      const level = normalizeSeverity(i.severity);
+      acc[level] += 1;
+      return acc;
+    },
+    { high: 0, medium: 0, safe: 0 }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Derived summaries — one per dashboard component, all sourced from the
+// single unified /api/incidents payload.
+// ---------------------------------------------------------------------------
+
+/**
+ * fetchLlmShieldSummary
+ * Feeds LlmShield.jsx — derives KPIs + intercept log rows from incidents
+ * whose vector matches a known LLM API host.
+ */
+export async function fetchLlmShieldSummary() {
+  const { incidents } = await getIncidents();
+  const llmIncidents = incidents.filter(isLlmIncident);
+
+  const promptsScanned = llmIncidents.length;
+  const keysNeutralized = llmIncidents.filter((i) => i?.metadata?.decoyPayload).length;
+  // NOTE: backend doesn't currently expose per-request latency on incidents.
+  // Swap this for a real field (e.g. incident.metadata.latencyMs) once available.
+  const avgLatencyMs = 0;
+
+  const logs = llmIncidents.map((i) => ({
+    id: i.id,
+    time: i.date,
+    provider: (i.vector || '').split('/')[0] || i.vector,
+    category: i.url, // "url" field carries the AI match category per backend spec
+    status: i.status,
+    severity: normalizeSeverity(i.severity),
+  }));
+
+  return { promptsScanned, keysNeutralized, avgLatencyMs, logs };
+}
+
+/**
+ * fetchDecoySwapperSummary
+ * Feeds DecoySwapper.jsx — derives KPIs + flagged sites table from incidents
+ * that are neither LLM traffic nor image scans (i.e. spoofed domains).
+ */
+export async function fetchDecoySwapperSummary() {
+  const { incidents } = await getIncidents();
+  const decoyIncidents = incidents.filter(isDecoyIncident);
+
+  const domainsMonitored = new Set(decoyIncidents.map((i) => i.vector)).size;
+  const decoysInjected = decoyIncidents.filter((i) => i?.metadata?.decoyPayload).length;
+  const successRate = decoyIncidents.length
+    ? Math.round((decoysInjected / decoyIncidents.length) * 100)
+    : 0;
+
+  const sites = decoyIncidents.map((i) => ({
+    id: i.id,
+    host: i.vector,
+    category: i.url,
+    action: i?.metadata?.decoyPayload ? 'decoy served' : i.status.toLowerCase(),
+    severity: normalizeSeverity(i.severity),
+  }));
+
+  return { domainsMonitored, decoysInjected, successRate, sites };
+}
+
+/**
+ * fetchAssetsSummary
+ * Feeds the current ImageRedaction.jsx KPI row (imagesScanned,
+ * piiElementsFound) — derived from image-type incidents in the unified feed.
+ */
+export async function fetchAssetsSummary() {
+  const { incidents } = await getIncidents();
+  const imageIncidents = incidents.filter(isImageIncident);
+
+  const imagesScanned = imageIncidents.length;
+  const piiElementsFound = imageIncidents.reduce(
+    (sum, i) => sum + (i.metadata?.piiCount ?? 0),
+    0
+  );
+
+  return { imagesScanned, piiElementsFound };
+}
+
+/**
+ * fetchImageRedactionSummary
+ * Feeds ImageRedaction.jsx — derives KPIs, bounding boxes for the most recent
+ * scan, and a "backend response" panel from image-type incidents.
+ */
+export async function fetchImageRedactionSummary() {
+  const { incidents } = await getIncidents();
+  const imageIncidents = incidents.filter(isImageIncident);
+
+  const imagesScanned = imageIncidents.length;
+  const piiElementsFound = imageIncidents.reduce(
+    (sum, i) => sum + (i.metadata?.piiCount ?? 0),
+    0
+  );
+  // Same caveat as LLM Shield: latency isn't in the incidents schema yet.
+  const avgLatencyMs = 0;
+
+  const latest = imageIncidents[0]; // backend returns most recent first
+  const boxes = latest?.metadata?.boundingBoxes ?? [];
+
+  const headers = {
+    status: latest?.metadata?.status ?? 'N/A',
+    piiCount: latest?.metadata?.piiCount ?? 0,
+    latencyMs: avgLatencyMs,
+    dimensions: latest?.metadata?.dimensions ?? 'N/A',
+  };
+
+  return { imagesScanned, piiElementsFound, avgLatencyMs, boxes, headers };
 }
