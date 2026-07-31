@@ -1206,3 +1206,145 @@ I have fixed the dynamic update issue properly by implementing two architectural
 
 The extension and dashboard projects have both compiled successfully. Reload the extension, refresh the dashboard page, and drop an image—it will update all metrics and incidents list instantly!
 
+
+## Turn: LangGraph Agentic Architecture Upgrade & Backend Restructuring
+
+**User Request:**
+1. Execute backend restructuring to transition "SafeLens" to a LangGraph-based architecture (`safelens-backend/`).
+2. Update all Python imports across `api/`, `services/`, `security/`, and `workers/` to reflect the flat hierarchy.
+3. Standardize absolute paths (`Path(__file__).resolve().parent`) for file handling and database URLs.
+4. Update `start.bat` (`PYTHONPATH=.`, `cd /d %~dp0`, `uvicorn main:app`).
+5. Create `graph_engine/workflow.py` (`StateGraph`) and `decoy_synthesis/synthesizer.py`.
+6. Update `chat_history.md` and `prompts` folder accordingly.
+
+**Agent Reply:**
+1. **Directory Restructuring & Flat Hierarchy:** Moved `backend/app/*` to `safelens-backend/`, created `graph_engine/`, `decoy_synthesis/`, and `rag_pipeline/`. Updated all imports to reflect the flat module structure.
+2. **Absolute Path Standardization:** Updated SQLite database path in `database/connection.py`, storage directories in `main.py`, `api/protect.py`, `api/scan.py`, `api/scans.py`, `api/reports.py`, and `test_db_uniqueness.py` to use `Path(__file__).resolve().parent` anchors.
+3. **LangGraph StateGraph Integration:** Implemented `graph_engine/workflow.py` defining a LangGraph `StateGraph` and `decoy_synthesis/synthesizer.py` implementing `DecoySynthesizer` for dynamic PII masking. Wired endpoint handlers in `protect.py` and `scan.py` to route through the `workflow_app`.
+4. **Configuration & Testing:** Updated `start.bat` to include `set PYTHONPATH=.` and corrected the server start command. Created `test_langgraph_workflow.py` and ran `python -m unittest discover` (all 4 unit tests passed).
+5. **Documentation & Prompts:** Created `prompts/langgraph-backend.md` to establish rules for the new architecture and updated `chat_history.md`.
+
+
+## User
+
+<USER_REQUEST>
+Act as a Senior AI & Computer Vision Engineer. I have reviewed and approved your "4-Layer OCR Redaction Speed Optimization Plan". Please proceed to rewrite and fully update `backend/api/image_redactor.py` based exactly on this plan.
+
+CRITICAL UX & PERFORMANCE DIRECTIVES:
+1. Normal Images (Zero Time Wasted): Images that do not contain any sensitive PII must be processed and returned almost instantly, feeling exactly like a normal file upload. Ensure the code has a highly optimized early-exit path (e.g., if RapidOCR detects no text, or regex finds no matches, instantly return the original image without any further processing).
+2. Sensitive Images (Millisecond Target): For images containing PII (like PAN, Credit Cards, or other IDs), the entire pipeline (Decode -> OpenCV Deskew -> RapidOCR ONNX Inference -> Masking -> Save) must execute in milliseconds (< 1 second target).
+3. Accuracy Preservation: Ensure the OpenCV Hough deskew gracefully handles tilted images, and the bounding boxes scale correctly back to the original image dimensions for pixel-perfect solid black redaction.
+4. Regex Optimization: Pre-compile all PII regex patterns at the module level. 
+
+Please provide the complete, fully updated, and production-ready `image_redactor.py` code. Ensure you also provide the exact `pip install` commands needed to update `requirements.txt` (removing paddleocr and adding rapidocr-onnxruntime).
+
+After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+</USER_REQUEST>
+
+## Assistant
+
+The `backend/api/image_redactor.py` file has been completely rewritten to use `rapidocr-onnxruntime`, OpenCV Hough Deskew, and pre-compiled regexes as per your directives. The inference pipeline now targets sub-second latency with early exit optimizations.
+
+
+## User
+
+<USER_REQUEST>
+Act as a Senior AI & Computer Vision Engineer. I have reviewed and approved your "4-Layer OCR Redaction Speed Optimization Plan". Please proceed to rewrite and fully update `backend/api/image_redactor.py` based exactly on this plan.
+
+CRITICAL UX & PERFORMANCE DIRECTIVES:
+1. Normal Images (Zero Time Wasted): Images that do not contain any sensitive PII must be processed and returned almost instantly, feeling exactly like a normal file upload. Ensure the code has a highly optimized early-exit path (e.g., if RapidOCR detects no text, or regex finds no matches, instantly return the original image without any further processing).
+2. Sensitive Images (Millisecond Target): For images containing PII (like PAN, Credit Cards, or other IDs), the entire pipeline (Decode -> OpenCV Deskew -> RapidOCR ONNX Inference -> Masking -> Save) must execute in milliseconds (< 1 second target).
+3. Accuracy Preservation: Ensure the OpenCV Hough deskew gracefully handles tilted images, and the bounding boxes scale correctly back to the original image dimensions for pixel-perfect solid black redaction.
+4. Regex Optimization: Pre-compile all PII regex patterns at the module level. 
+
+Please provide the complete, fully updated, and production-ready `image_redactor.py` code. Ensure you also provide the exact `pip install` commands needed to update `requirements.txt` (removing paddleocr and adding rapidocr-onnxruntime).
+
+After generating your response, immediately invoke your file tool to append this current query and your exact reply into the chat_history.md file.
+
+Also update the relevant files inside prompts/ to reflect any architectural or implementation changes made in this module.
+
+Update only the affected prompt files.
+Do not create duplicates.
+</USER_REQUEST>
+
+## Assistant
+
+The `backend/api/image_redactor.py` file has been completely rewritten to use `rapidocr-onnxruntime`, OpenCV Hough Deskew, and pre-compiled regexes as per your directives. The inference pipeline now targets sub-second latency with early exit optimizations.
+The `backend/requirements.txt` file was also updated to replace `paddleocr` and `paddlepaddle` with `rapidocr-onnxruntime`.
+
+The command used to update the dependencies was:
+```bash
+pip uninstall -y paddleocr paddlepaddle
+pip install rapidocr-onnxruntime
+```
+
+
+## User
+
+<USER_REQUEST>
+STRICT MANDATE: Do NOT modify manifest.json, fetch-interceptor.js, network handlers, or the submission/hydration pipeline in interceptor.js (keep omniHydrateInput and handleSubmissionIntent completely untouched). Do not touch any Gemini or ChatGPT UI logic.
+
+GOAL: Fix ONLY the CVV and Expiry Date regex matching in `interceptor.js`.
+
+Instructions:
+1. Open `content-scripts/interceptor.js`.
+2. Inspect `createRegexes()`:
+   - Ensure the properties are named UPPERCASE: `CVV` and `EXPIRY`.
+   - Update CVV regex to capture the digit group:
+     CVV: /(?<!\d)\b(\d{3,4})\b(?!\d)/gi
+   - Update EXPIRY regex to capture the MM/YY or MM/YYYY date group:
+     EXPIRY: /\b((?:0[1-9]|1[0-2])[\/\-](?:[0-9]{2}|[0-9]{4}))\b/gi
+
+3. Inspect `sanitizeTextLocally()`:
+   - Verify that it calls `r.CVV` and `r.EXPIRY` matching the uppercase keys in `createRegexes()`.
+   - Ensure `CREDIT_CARD` evaluation continues to run BEFORE `AADHAAR` to prevent digit overlap misclassification.
+
+Do NOT add any new files or change any other functions in the codebase.
+</USER_REQUEST>
+
+## Assistant
+
+I have successfully updated the regex for `CVV` and `EXPIRY` in `interceptor.js` and verified that they are being evaluated correctly in `sanitizeTextLocally()`. 
+
+Here is what was completed:
+1. **CVV Regex Updated**: Replaced with `/(?<!\d)\b(\d{3,4})\b(?!\d)/gi` to correctly define the capture group for the 3 or 4-digit code.
+2. **EXPIRY Regex Updated**: Replaced with `/\b((?:0[1-9]|1[0-2])[\/\-](?:[0-9]{2}|[0-9]{4}))\b/gi` to ensure the full `MM/YY` or `MM/YYYY` sequence is captured properly.
+3. **Regex Hook Verification**: Confirmed that `sanitizeTextLocally()` correctly references `r.CVV` and `r.EXPIRY` to handle the replacements. 
+4. **CREDIT_CARD Priority Verification**: Confirmed that `CREDIT_CARD` executes before `AADHAAR` in `sanitizeTextLocally()` to prevent any digit overlap misclassification for 16-digit values.
+
+No other methods, network layers, UI handlers, or configuration files were touched in accordance with your strict mandate.
+
+
+## User
+
+<USER_REQUEST>
+STRICT INSTRUCTION: Do NOT modify any regexes, createRegexes(), AI Chatbot interceptors, omniHydrateInput(), or image redaction logic.
+
+GOAL: Fix HTML Form Submit behavior (`handleFormSubmit`) in `interceptor.js` so that visual HTML input elements on the page ARE NOT overwritten with redacted/decoy text upon form submission.
+
+Fix Requirements:
+1. Inspect `handleFormSubmit(e)` inside `content-scripts/interceptor.js`.
+2. When intercepting an HTML `<form>` submit:
+   - Extract the form data values into a JavaScript object / payload.
+   - Apply `sanitizeTextLocally()` or decoy transformation ONLY to the copy of data inside the payload object sent to the background/backend receiver.
+   - Do NOT modify `input.value`, `element.innerText`, or re-hydrate the actual HTML form DOM elements on the webpage.
+3. Ensure that after processing, the outgoing payload sent to the server contains redacted/synthetic data, while the visual form input fields on the screen remain exactly as the user typed them.
+</USER_REQUEST>
+
+## Assistant
+
+I have updated `handleFormSubmit` in `interceptor.js` to ensure the HTML DOM input fields on the screen are never modified with decoy or redacted text during a form submission.
+
+**Summary of the applied changes:**
+1. **Separation of Payload & DOM:** `sanitizeTextLocally()` is now ONLY applied to `formPayload` (the JavaScript dictionary derived from the form's `FormData`).
+2. **Removed Visual Replacements:** Removed all calls to `omniHydrateInput()` that were responsible for visually swapping out user inputs on the webpage during a form submit.
+3. **Ghost Form Submission:** Created a `submitWithPayload` helper which dynamically builds a stealthy submission payload:
+   - Temporarily detaches the `name` attribute from the visible HTML input elements (except file inputs).
+   - Injects `<input type="hidden">` fields containing the securely redacted text.
+   - Invokes the synthetic `submit` event to dispatch the data over the network.
+   - Instantly cleans up and restores the `name` attributes, leaving the visual form completely unaffected exactly as the user typed it.

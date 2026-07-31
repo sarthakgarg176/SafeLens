@@ -10,4 +10,9 @@ apscheduler==3.10.4
 python-multipart==0.0.12
 python-dotenv==1.0.1
 aiofiles==24.1.0
-
+langgraph
+langchain-core
+gliner>=0.1.0
+opencv-python
+rapidocr-onnxruntime
+zxing-cpp

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SafeLens</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-card">
+    <h1>SafeLens Privacy Shield</h1>
+    <p class="popup-subtitle">Agentic protection controls</p>
+
+    <div class="toggle-row">
+      <span>Use New Agentic Engine</span>
+      <label class="switch">
+        <input type="checkbox" id="useNewAgentToggle" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="snooze-section">
+      <div class="section-title">Smart Pause / Snooze</div>
+      <div id="pauseControls" class="snooze-controls">
+        <select id="pauseDurationSelect" class="snooze-select">
+          <option value="30m">Pause for 30 Mins</option>
+          <option value="1h">Pause for 1 Hour</option>
+          <option value="1d">Pause for 1 Day</option>
+          <option value="indefinite">Pause Until Reactivated</option>
+        </select>
+        <button id="pauseActionBtn" class="snooze-btn">Pause</button>
+      </div>
+    </div>
+
+    <div class="status-box">
+      <div class="status-line">
+        <span id="statusDot" class="safelens-status-dot safelens-status-dot--success"></span>
+        <span id="statusText">Protection Active</span>
+      </div>
+      <div id="countdownDisplay" class="countdown-text" style="display: none;"></div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

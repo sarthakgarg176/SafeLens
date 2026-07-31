@@ -1,4 +1,4 @@
-#!C:\Users\LENOVO\SafeLens\backend\venv\Scripts\python.exe
+#!D:\SafeLens_Final\SafeLens\backend\venv\Scripts\python.exe
 from __future__ import absolute_import, division, print_function
 
 from PIL import Image

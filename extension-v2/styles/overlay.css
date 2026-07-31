@@ -1,0 +1,27 @@
+:root {
+  --safelens-status-green: #00ffcc;
+  --safelens-status-yellow: #ff9900;
+  --safelens-status-red: #ff3333;
+}
+
+.safelens-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.safelens-status-dot--success {
+  background: var(--safelens-status-green);
+  box-shadow: 0 0 6px var(--safelens-status-green);
+}
+
+.safelens-status-dot--warning {
+  background: var(--safelens-status-yellow);
+  box-shadow: 0 0 6px var(--safelens-status-yellow);
+}
+
+.safelens-status-dot--error {
+  background: var(--safelens-status-red);
+  box-shadow: 0 0 6px var(--safelens-status-red);
+}

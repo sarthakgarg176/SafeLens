@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeLens AI Shield - Spoofed Website & Synthetic Data Inspector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0f1d;
+      --card-bg: rgba(16, 24, 48, 0.75);
+      --border-glow: rgba(0, 242, 254, 0.25);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00e676;
+      --accent-red: #ff5252;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 15% 15%, rgba(0, 242, 254, 0.08) 0px, transparent 50%),
+        radial-gradient(at 85% 85%, rgba(79, 172, 254, 0.08) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(0, 242, 254, 0.1);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      padding: 6px 16px;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glow);
+      border-radius: 16px;
+      padding: 1.8rem;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title span {
+      font-size: 1.4rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.2rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    input[type="text"], input[type="email"], textarea {
+      width: 100%;
+      background: rgba(10, 15, 29, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.3);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .btn {
+      width: 100%;
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      color: #040914;
+      border: none;
+      padding: 12px 20px;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 1.2rem;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: none;
+    }
+
+    .terminal {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 1.2rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.88rem;
+      color: #a9b7c6;
+      min-height: 280px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    .status-tag {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-tag.sanitized {
+      background: rgba(0, 230, 118, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(0, 230, 118, 0.4);
+    }
+
+    .status-tag.raw {
+      background: rgba(255, 82, 82, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(255, 82, 82, 0.4);
+    }
+
+    .log-entry {
+      margin-bottom: 1.2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+
+    .log-timestamp {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      margin-bottom: 6px;
+    }
+
+    .code-block {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 6px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #39adb5;
+    }
+
+    .code-block.highlight {
+      color: #00e676;
+      border-left: 3px solid var(--accent-green);
+    }
+
+    .code-block.danger {
+      color: #ff5252;
+      border-left: 3px solid var(--accent-red);
+    }
+
+    .instructions {
+      margin-top: 2rem;
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 4px solid var(--accent-cyan);
+      padding: 1.2rem 1.5rem;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .instructions h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.6rem;
+      color: var(--accent-cyan);
+    }
+
+    .instructions ol {
+      padding-left: 1.2rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .instructions li {
+      margin-bottom: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">SafeLens AI Shield Test Suite</div>
+      <h1>Spoofed Webpage & Synthetic Data Receiver</h1>
+      <p class="subtitle">Enter sensitive PII data below to test how SafeLens intercepts form submissions and transmits synthetic decoys to the receiver.</p>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT COLUMN: Spoofed Website Form -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🌐</span> Spoofed Form Interface
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="autofillSampleData()" style="width: auto; padding: 6px 12px; margin: 0; font-size: 0.82rem;">
+            ⚡ Auto-Fill Sample PII
+          </button>
+        </div>
+
+        <!-- FORM INTERCEPTION TEST -->
+        <form id="spoofedForm" action="#" method="POST" onsubmit="handleFormSubmission(event)">
+          <div class="form-group">
+            <label for="fullName">Full Name / Account Holder</label>
+            <input type="text" id="fullName" name="fullName" placeholder="e.g. Rahul Sharma" required>
+          </div>
+
+          <div class="form-group">
+            <label for="cardNumber">Credit Card Number</label>
+            <input type="text" id="cardNumber" name="cardNumber" placeholder="e.g. 4532 0154 9876 1234" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="expiry">Expiry Date (MM/YY)</label>
+              <input type="text" id="expiry" name="expiry" placeholder="12/28">
+            </div>
+            <div class="form-group">
+              <label for="cvv">CVV Code</label>
+              <input type="text" id="cvv" name="cvv" placeholder="492">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="aadhaar">Aadhaar / Govt ID</label>
+              <input type="text" id="aadhaar" name="aadhaar" placeholder="9876 5432 1098">
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="text" id="phone" name="phone" placeholder="+91 9876543210">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="rahul.sharma@example.com">
+          </div>
+
+          <button type="submit" class="btn" id="submitFormBtn">
+            🔒 Submit Form Data to Receiver
+          </button>
+        </form>
+      </div>
+
+      <!-- RIGHT COLUMN: Real-Time Receiver Terminal -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📡</span> Website Receiver Payload Inspector
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="clearTerminal()" style="width: auto; padding: 6px 12px; margin: 0; font-size: 0.82rem;">
+            🗑️ Clear Log
+          </button>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+          This terminal displays the <strong>EXACT payload that reached the website's receiving handler</strong> after SafeLens processing.
+        </p>
+
+        <div class="terminal" id="terminalLog">
+          <div style="color: #6272a4; text-align: center; padding-top: 80px;">
+            [Receiver Ready]<br>
+            Waiting for form submission event...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <h3>💡 How to test and verify SafeLens synthetic data swapping:</h3>
+      <ol>
+        <li>Make sure the <strong>SafeLens Chrome Extension</strong> is loaded and enabled.</li>
+        <li>Click <strong>"Auto-Fill Sample PII"</strong> to fill in test sensitive data.</li>
+        <li>Click <strong>"Submit Form Data to Receiver"</strong>.</li>
+        <li>Check the <strong>Website Receiver Payload Inspector</strong>:
+          <ul>
+            <li>When SafeLens is active, it intercepts the submit event and replaces sensitive fields with synthetic decoys or redacted placeholders (e.g. <code>[REDACTED_CARD]</code>, <code>[EXP_REDACTED]</code>, <code>[CVV_REDACTED]</code>, or synthetic values). The terminal tags the payload with <span style="color:#00e676;">🛡️ SYNTHETIC DECOY SWAPPED</span>.</li>
+            <li>If SafeLens is disabled/paused, raw PII will pass unredacted, tagged with <span style="color:#ff5252;">⚠️ RAW UNREDACTED PAYLOAD</span>.</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    function autofillSampleData() {
+      document.getElementById('fullName').value = "Rahul Sharma";
+      document.getElementById('cardNumber').value = "4532 0154 9876 1234";
+      document.getElementById('expiry').value = "12/28";
+      document.getElementById('cvv').value = "492";
+      document.getElementById('aadhaar').value = "9876 5432 1098";
+      document.getElementById('phone').value = "+91 9876543210";
+      document.getElementById('email').value = "rahul.sharma@example.com";
+    }
+
+    function clearTerminal() {
+      document.getElementById('terminalLog').innerHTML = `
+        <div style="color: #6272a4; text-align: center; padding-top: 80px;">
+          [Receiver Ready]<br>
+          Waiting for form submission event...
+        </div>`;
+    }
+
+    function logToTerminal(type, payloadData) {
+      const terminal = document.getElementById('terminalLog');
+      
+      if (terminal.querySelector('div[style*="text-align: center"]')) {
+        terminal.innerHTML = '';
+      }
+
+      const timestamp = new Date().toLocaleTimeString();
+      const payloadString = JSON.stringify(payloadData, null, 2);
+      
+      const isSanitized = payloadString.includes('REDACTED') || 
+                          payloadString.includes('Decoy') || 
+                          payloadString.includes('Synthetic') ||
+                          payloadString.includes('EXP_REDACTED') ||
+                          payloadString.includes('CVV_REDACTED') ||
+                          !payloadString.includes('4532 0154 9876 1234');
+
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <div class="log-timestamp">
+          [${timestamp}] Incoming Payload via ${type} 
+          <span class="status-tag ${isSanitized ? 'sanitized' : 'raw'}">
+            ${isSanitized ? '🛡️ SYNTHETIC DECOY SWAPPED' : '⚠️ RAW UNREDACTED PAYLOAD'}
+          </span>
+        </div>
+        <div class="code-block ${isSanitized ? 'highlight' : 'danger'}">${escapeHtml(payloadString)}</div>
+      `;
+
+      terminal.prepend(entry);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function handleFormSubmission(e) {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      
+      console.log("[Spoofed Receiver] Form submitted. Payload captured by receiver:", data);
+      logToTerminal('HTML <form> Submit', data);
+    }
+  </script>
+</body>
+</html>
