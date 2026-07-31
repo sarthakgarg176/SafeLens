@@ -181,6 +181,282 @@
   );
 
   // ---------------------------------------------------------------------
+  // TEXT / PROMPT INTERCEPTION
+  // Same idea as the file interception above: block the native Enter
+  // keypress / Send-button click synchronously, scan the typed text via
+  // PROCESS_TEXT_FORM, then either let a (possibly sanitized) resend
+  // through or block it entirely if it can't be verified safe.
+  //
+  // NOTE: ChatGPT/Claude-style chat UIs generally use a contenteditable
+  // div for the prompt box rather than a <textarea>. This handles both.
+  // Site-specific selectors weren't available, so the "send button"
+  // detection below is a heuristic (looks for aria-label/data-testid
+  // containing "send" on the clicked element or its nearby ancestors).
+  // If it doesn't fire on a particular site, tell me the exact selector
+  // for that site's send button/prompt box and I'll tighten this up.
+  // ---------------------------------------------------------------------
+
+  // Set right before we programmatically re-dispatch a "send" trigger
+  // (Enter keydown / button click) so our own listener lets it through
+  // instead of re-intercepting and looping forever.
+  let bypassNextSubmit = false;
+  let textCheckInFlight = false;
+
+  function getPromptText(el) {
+    if (!el) return '';
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return el.value || '';
+    if (el.isContentEditable) return el.innerText || el.textContent || '';
+    return '';
+  }
+
+  // Replaces the text inside the prompt box with `text`, without breaking
+  // rich-text editors (ProseMirror, Slate, Lexical, etc.) that ChatGPT/
+  // Claude-style sites commonly use for contenteditable prompt boxes.
+  //
+  // Directly setting textContent/innerText bypasses the editor's own
+  // input pipeline, so its internal document model gets out of sync with
+  // the DOM — the editor then submits its OWN (stale/unredacted) copy on
+  // send, ignoring what we just wrote. Using execCommand('insertText')
+  // instead fires real beforeinput/input events through the browser's
+  // native editing pipeline, which is what these editors listen to, so
+  // their internal state gets updated correctly along with the DOM.
+  function setPromptText(el, text) {
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+      const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+      nativeSetter.call(el, text);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    }
+
+    if (el.isContentEditable) {
+      el.focus();
+
+      // Select all existing content inside this specific editable element
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const inserted = document.execCommand('insertText', false, text);
+      if (!inserted) {
+        // Fallback if execCommand isn't available/supported
+        el.textContent = text;
+        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  function findSendButtonAncestor(target) {
+    let el = target;
+    for (let i = 0; i < 4 && el; i++, el = el.parentElement) {
+      if (!el.getAttribute) continue;
+      const label = el.getAttribute('aria-label') || el.getAttribute('data-testid') || '';
+      if (/send/i.test(label)) return el;
+    }
+    return null;
+  }
+
+  function requestTextProtection(text) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          action: 'PROCESS_TEXT_FORM', // matches service-worker.js listener
+          payload: { text }
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error(`[${EXT_NAME}] Text message error:`, chrome.runtime.lastError.message);
+            resolve({ status: 'error', message: chrome.runtime.lastError.message });
+            return;
+          }
+          resolve(response || {});
+        }
+      );
+    });
+  }
+
+  // Normalizes the two possible backend response shapes:
+  //  - legacy engine: { status, recommendation, hits, riskScore, decoyPayload }
+  //  - new agent:      { status, decoy_applied, sanitized_text, payload }
+  //
+  // When PII is found and the backend gives us a spoofed/decoy value
+  // (sanitized_text, or payload.synthetic_value as a fallback), we swap
+  // it into the prompt box and let the send proceed with THAT text — the
+  // real number/email never gets sent. If no safe replacement text is
+  // available at all (e.g. legacy engine, which only flags PII without
+  // producing a decoy), we fall back to blocking the send entirely.
+  function interpretTextResponse(response) {
+    if (!response || response.status === 'error') {
+      return { piiFound: true, replacementText: null, verified: false };
+    }
+
+    if (typeof response.recommendation === 'string') {
+      // legacy engine — verdict only, no decoy/spoofed text is produced
+      return {
+        piiFound: response.recommendation === 'REDACT_MANDATORY',
+        replacementText: null,
+        verified: true
+      };
+    }
+
+    // new agent path
+    const piiFound = Boolean(response.decoy_applied);
+    let replacementText = response.sanitized_text || null;
+    const syntheticValue = response.payload && response.payload.synthetic_value;
+
+    // Safety net: if sanitized_text wasn't actually swapped for some
+    // reason, fall back to the synthetic value directly.
+    if (piiFound && syntheticValue && (!replacementText || replacementText === response.text)) {
+      replacementText = syntheticValue;
+    }
+
+    return { piiFound, replacementText, verified: true };
+  }
+
+  async function scanAndSubmit(el, dispatchResend) {
+    const rawText = getPromptText(el).trim();
+    if (!rawText) {
+      dispatchResend();
+      return;
+    }
+
+    const isTrusted = await window.SafeLensDomainChecker.isTrustedDomain();
+    if (isTrusted) {
+      dispatchResend();
+      return;
+    }
+
+    console.log(`[${EXT_NAME}] Untrusted domain - scanning prompt text before send...`);
+    const response = await requestTextProtection(rawText);
+    console.log(`[${EXT_NAME}] Text scan result:`, response);
+
+    window.postMessage({ type: 'SAFELENS_SCAN_COMPLETED', payload: response }, '*');
+
+    const { piiFound, replacementText, verified } = interpretTextResponse(response);
+
+    if (!verified) {
+      window.dispatchEvent(new CustomEvent('safelens:notify', {
+        detail: { status: 'error', message: 'Protection check failed - please review manually.' }
+      }));
+      return; // don't resend — we couldn't verify the text is safe
+    }
+
+    if (!piiFound) {
+      // Clean — safe to send as-is
+      dispatchResend();
+      return;
+    }
+
+    if (replacementText && replacementText !== rawText) {
+      setPromptText(el, replacementText);
+
+      // CRITICAL: verify the swap actually took effect — and STAYS in
+      // effect — before letting the send proceed. Rich-text editors like
+      // ChatGPT's (ProseMirror-based) maintain their own internal document
+      // model. An immediate check right after execCommand can show the
+      // replacement text in the DOM, but the editor's framework may then
+      // asynchronously re-render and revert the DOM back to what ITS model
+      // thinks the content is (the original, unredacted text) a moment
+      // later. So we check twice: once immediately, and once again after
+      // a short delay (giving any such re-render a chance to happen)
+      // before we trust it enough to dispatch the send.
+      const immediateMatch = getPromptText(el).trim() === replacementText.trim();
+
+      if (immediateMatch) {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        const delayedMatch = getPromptText(el).trim() === replacementText.trim();
+
+        if (delayedMatch) {
+          window.dispatchEvent(new CustomEvent('safelens:notify', {
+            detail: { status: 'success', message: 'Sensitive data replaced with a decoy before sending.' }
+          }));
+          dispatchResend();
+          return;
+        }
+
+        console.warn(`[${EXT_NAME}] Prompt box reverted to original text after swap (editor re-render) - blocking send to avoid leaking real data.`);
+      } else {
+        console.warn(`[${EXT_NAME}] Text swap could not be verified - blocking send to avoid leaking real data.`);
+      }
+    }
+
+    // No usable decoy text (legacy engine, or the swap failed) — block
+    // the send rather than risk leaking the real value.
+    window.dispatchEvent(new CustomEvent('safelens:notify', {
+      detail: {
+        status: 'error',
+        message: 'Sensitive data detected (phone/email/etc.) - message blocked. Please remove it and resend.'
+      }
+    }));
+  }
+
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (bypassNextSubmit) { bypassNextSubmit = false; return; }
+      if (e.key !== 'Enter' || e.shiftKey) return;
+
+      const el = e.target;
+      const isEditable = el && (el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (!isEditable) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      if (textCheckInFlight) return; // a check is already running, drop this extra Enter
+      textCheckInFlight = true;
+
+      scanAndSubmit(el, () => {
+        bypassNextSubmit = true;
+        el.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+          bubbles: true, cancelable: true
+        }));
+      }).finally(() => { textCheckInFlight = false; });
+    },
+    true // capture phase
+  );
+
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (bypassNextSubmit) { bypassNextSubmit = false; return; }
+
+      const sendBtn = findSendButtonAncestor(e.target);
+      if (!sendBtn) return;
+
+      const el = findActivePromptBox();
+      if (!el) return; // no prompt box found — let the click through as-is
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      if (textCheckInFlight) return;
+      textCheckInFlight = true;
+
+      scanAndSubmit(el, () => {
+        bypassNextSubmit = true;
+        sendBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      }).finally(() => { textCheckInFlight = false; });
+    },
+    true // capture phase
+  );
+
+  function findActivePromptBox() {
+    const active = document.activeElement;
+    if (active && (active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+      return active;
+    }
+    const candidates = Array.from(document.querySelectorAll('textarea, [contenteditable="true"]'));
+    return candidates.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight))[0] || null;
+  }
+
+  // ---------------------------------------------------------------------
   // Dashboard bridge — responds to window.postMessage from
   // services/extensionBridge.js so the dashboard can show live
   // Active/Snoozed/Not-Detected shield status.
