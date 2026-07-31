@@ -33,7 +33,7 @@ export default function LlmShield() {
   }
 
   const llmIncidents = incidents.filter((i) => classifyIncident(i) === 'llm');
-  const highSeverityCount = llmIncidents.filter((i) => i.severity === 'high').length;
+  const highSeverityCount = llmIncidents.filter((i) => ['high', 'serious', 'critical'].includes((i.severity || '').toLowerCase())).length;
   const decoysInjectedCount = llmIncidents.filter((i) => i.metadata?.decoyPayload).length;
   const diffExample = llmIncidents.find((i) => i.metadata?.originalPayload && i.metadata?.decoyPayload);
 

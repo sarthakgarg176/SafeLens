@@ -10,8 +10,8 @@
  * - Output: Object[] (Array of structured line objects with text and bbox)
  * 
  * Interacts with:
- * - extension/src/ai/ocr/recognizeImage.js
- */
+ * - recognizeImage.js: Receives OCR payload for line extraction.
+ *
 
 /**
  * Organizes OCR payload into structured horizontal line blocks.
