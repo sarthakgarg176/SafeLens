@@ -12,7 +12,7 @@
  */
 
 window.SafeLensDomainChecker = (function () {
-  const DYNAMIC_WHITELIST_KEY = 'safelens_whitelist';
+  const DYNAMIC_WHITELIST_KEY = 'SAFELENS_WHITELIST';
 
   let whitelistCache = null;
 

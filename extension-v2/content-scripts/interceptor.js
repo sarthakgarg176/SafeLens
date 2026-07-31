@@ -62,6 +62,11 @@
           })
         );
 
+        // Broadcast scan completion so the dashboard (SecurityContext.jsx)
+        // refreshes its incidents/takedowns immediately instead of waiting
+        // for the next 15-second poll.
+        window.postMessage({ type: 'SAFELENS_SCAN_COMPLETED', payload: response }, '*');
+
         // If a decoy payload was generated, swap the file (future step)
         if (response.decoyPayload) {
           // Placeholder: swap logic will use DataTransfer to replace input.files
@@ -95,9 +100,9 @@
   // Active/Snoozed/Not-Detected shield status.
   // ---------------------------------------------------------------------
   const STORAGE_KEYS = {
-    paused: 'safelens_extensionPaused',
-    pauseUntil: 'safelens_pauseUntilTimestamp',
-    whitelist: 'safelens_whitelist',
+    paused: 'extensionPaused',
+    pauseUntil: 'pauseUntilTimestamp',
+    whitelist: 'SAFELENS_WHITELIST',
   };
 
   async function getShieldStatus() {
