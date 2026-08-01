@@ -13,30 +13,17 @@
     "https://safelens-zttx.onrender.com/*"
   ],
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "background/service-worker.js",
     "type": "module"
-  },
-  "externally_connectable": {
-    "matches": [
-      "http://localhost:5173/*",
-      "https://*.onrender.com/*",
-      "https://*.cloakai.ai/*"
-    ]
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js", "content/uploadInterceptor.js"],
+      "js": [
+        "content-scripts/content.js", 
+        "content-scripts/interceptor.js"
+      ], 
       "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "http://localhost:5173/*",
-        "https://*.onrender.com/*",
-        "https://*.cloakai.ai/*"
-      ],
-      "js": ["content/dashboardBridge.js"],
-      "run_at": "document_end"
     }
   ]
 }

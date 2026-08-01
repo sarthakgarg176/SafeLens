@@ -1,8 +1,7 @@
 @echo off
-echo SafeLens Backend Starting...
 cd /d %~dp0
+echo SafeLens Backend Starting...
+set PYTHONPATH=.
 call venv\Scripts\activate.bat
-echo Virtual environment activated!
-echo Starting server...
-uvicorn app.main:app --reload
+venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
 pause

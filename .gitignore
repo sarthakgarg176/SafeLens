@@ -1,5 +1,85 @@
+<<<<<<< HEAD
 ﻿__pycache__/
 *.pyc
 *.db
 node_modules/
 .env
+=======
+# ==========================================
+# Environments & Secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+*.env
+
+# ==========================================
+# Python & Backend
+# ==========================================
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+
+# Byte-compiled / Optimized / C-extensions
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases & Local Storage
+*.db
+*.sqlite
+*.sqlite3
+backend/storage/
+storage/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==========================================
+# Node & Frontend / Extension
+# ==========================================
+# Dependencies
+node_modules/
+extension/node_modules/
+dashboard/node_modules/
+
+# Build Output
+dist/
+dist-ssr/
+build/
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+# IDEs, Editors & OS Files
+# ==========================================
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# JetBrains (PyCharm / WebStorm)
+.idea/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+>>>>>>> 26ff0777b9e47e87d1fc5054b4b69c557bcce0d5
