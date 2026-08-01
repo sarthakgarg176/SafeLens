@@ -114,16 +114,27 @@ def fast_deskew(img: np.ndarray) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150, apertureSize=3)
     lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
-    
-    if lines is None: return img  
-    
-    angles = [np.degrees(np.arctan2(l[0][3] - l[0][1], l[0][2] - l[0][0])) for l in lines]
+
+    if lines is None:
+        return img
+
+    angles = []
+    for l in lines:
+        # HoughLinesP usually returns shape (N,1,4), but can sometimes
+        # come back as (N,4) depending on the OpenCV build. Flatten to be safe.
+        coords = np.asarray(l).reshape(-1)
+        if coords.size < 4:
+            continue
+        x1, y1, x2, y2 = coords[:4]
+        angles.append(np.degrees(np.arctan2(y2 - y1, x2 - x1)))
     angles = [a for a in angles if -45 < a < 45]
-    if not angles: return img
-    
+    if not angles:
+        return img
+
     median_angle = np.median(angles)
-    if abs(median_angle) < 0.5: return img
-    
+    if abs(median_angle) < 0.5:
+        return img
+
     h, w = img.shape[:2]
     M = cv2.getRotationMatrix2D((w // 2, h // 2), median_angle, 1.0)
     return cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255))

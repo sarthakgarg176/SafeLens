@@ -13,7 +13,10 @@ import {
   Settings as SettingsIcon,
   X,
   UserCheck,
-  LogOut
+  LogOut,
+  Bot,
+  Image as ImageIcon,
+  ShieldCheck
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -21,6 +24,9 @@ const NAV_ITEMS = [
   { key: 'policy', name: 'Policy Ingestion', icon: Database },
   { key: 'brain', name: 'Agentic Brain', icon: Cpu },
   { key: 'whitelist', name: 'Domain Whitelist', icon: Globe },
+  { key: 'llmshield', name: 'LLM Shield', icon: Bot },
+  { key: 'imageredaction', name: 'Image Redaction', icon: ImageIcon },
+  { key: 'decoyswapper', name: 'Decoy Swapper', icon: ShieldCheck },
   { key: 'logs', name: 'Interception Logs', icon: Terminal },
   { key: 'alerts', name: 'Spoofing Alerts', icon: ShieldAlert },
   { key: 'reports', name: 'Reports & Health', icon: FileText },
@@ -29,7 +35,7 @@ const NAV_ITEMS = [
 
 /**
  * Sidebar Component
- * Collapsible Cyberpunk Sidebar navigation linking all 8 dashboard tabs.
+ * Collapsible Cyberpunk Sidebar navigation linking all dashboard tabs.
  *
  * @param {Object} props
  * @param {string} props.activeTab - Currently active tab key
@@ -38,7 +44,7 @@ const NAV_ITEMS = [
  * @param {Function} props.toggleSidebar - mobile toggle trigger callback
  */
 export default function Sidebar({ activeTab, setActiveTab, isOpen, toggleSidebar }) {
-  
+
   const handleLogout = () => {
     localStorage.removeItem('cloakai_session_token');
     window.location.href = '/login';
@@ -46,7 +52,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, toggleSidebar
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-[#0d111c]/90 backdrop-blur-xl border-r border-white/5 text-gray-300 transition-colors duration-300">
-      
+
       {/* Brand Header */}
       <div className="flex items-center justify-between p-6 border-b border-white/5">
         <div className="flex items-center gap-3">

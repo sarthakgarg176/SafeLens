@@ -11,6 +11,10 @@ import SpoofingAlerts from './components/alerts/SpoofingAlerts';
 import DashboardReports from './components/reports/Reports';
 import DashboardSettings from './components/settings/Settings';
 import DashboardGrid from './components/DashboardGrid';
+import LlmShield from './components/features/LlmShield';
+import ImageRedaction from './components/features/ImageRedaction';
+import DecoySwapper from './components/features/DecoySwapper';
+import ShieldStatusBar from './components/common/ShieldStatusBar';
 import Assets from './pages/Assets';
 import ScanHistory from './pages/ScanHistory';
 import Reports from './pages/Reports';
@@ -22,7 +26,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import { SecurityProvider } from './context/SecurityContext';
 
-/* ─── Session helpers ───────────────────────────────────────────────────────── */
+/* ─── Session helpers ────────────────────────────────────────────────── */
 const SESSION_KEY = 'cloakai_session_token';
 
 function isAuthenticated() {
@@ -30,14 +34,14 @@ function isAuthenticated() {
   return typeof token === 'string' && token.trim().length > 0 && token !== 'false';
 }
 
-/* ─── Lock document to dark mode permanently ────────────────────────────────── */
+/* ─── Lock document to dark mode permanently ────────────────────────── */
 document.documentElement.classList.add('dark');
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────
    ProtectedRoute
    Wraps any dashboard route. Redirects unauthenticated users to /login,
    preserving the intended destination for post-login navigation.
-────────────────────────────────────────────────────────────────────────────── */
+──────────────────────────────────────────────────────────────────────── */
 function ProtectedRoute({ children }) {
   const location = useLocation();
   if (!isAuthenticated()) {
@@ -46,11 +50,11 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────
    PublicRoute
    Wraps the /login route. Redirects already-authenticated users to the
    dashboard root so they never see the login page while logged in.
-────────────────────────────────────────────────────────────────────────────── */
+──────────────────────────────────────────────────────────────────────── */
 function PublicRoute({ children }) {
   if (isAuthenticated()) {
     return <Navigate to="/" replace />;
@@ -58,12 +62,12 @@ function PublicRoute({ children }) {
   return children;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────
    DashboardShell
    The persistent shell (Sidebar + Navbar + main content area) rendered for
    every protected dashboard route. Checks token on layout render for airtight
    security.
-────────────────────────────────────────────────────────────────────────────── */
+──────────────────────────────────────────────────────────────────────── */
 function DashboardShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const toggleSidebar = () => setSidebarOpen((p) => !p);
@@ -86,10 +90,10 @@ function DashboardShell({ children }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────
    CommandCenter
    Main operations center utilizing tab-based view switching and shared states.
-────────────────────────────────────────────────────────────────────────────── */
+──────────────────────────────────────────────────────────────────────── */
 function CommandCenter() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -106,9 +110,9 @@ function CommandCenter() {
   const [threatLogs, setThreatLogs] = useState([
     { id: 'tlog-1', domain: 'api.openai.com/v1/chat', type: 'OpenAI API Key', action: 'Synthetic Decoy Deployed', status: 'success', time: '11:32:04' },
     { id: 'tlog-2', domain: 'slack.com/api/files.upload', type: 'Corporate SSH Private Key', action: 'Synthetic Decoy Deployed', status: 'success', time: '11:28:15' },
-    { id: 'tlog-3', domain: 'github.com/api/v3', type: 'Admin OAuth Credentials', action: 'Interception Block Triggered', status: 'failed', time: '11:15:42' },
+    { id: 'tlog-3', domain: 'github.com/api/v3', type: 'Admin OAuth Credentials',action: 'Interception Block Triggered', status: 'failed', time: '11:15:42' },
     { id: 'tlog-4', domain: 'internal.sandbox-dev.net', type: 'Database Query Payload', action: 'Whitelisted Bypass Code', status: 'warning', time: '11:02:11' },
-    { id: 'tlog-5', domain: 'huggingface.co/api/models', type: 'Production Secret Token', action: 'Synthetic Decoy Deployed', status: 'success', time: '10:58:30' }
+    { id: 'tlog-5', domain: 'huggingface.co/api/models', type: 'Production SecretToken', action: 'Synthetic Decoy Deployed', status: 'success', time: '10:58:30' }
   ]);
 
   const handleTogglePolicy = (id) => {
@@ -154,6 +158,12 @@ function CommandCenter() {
         return <AgenticBrain />;
       case 'whitelist':
         return <DomainWhitelist />;
+      case 'llmshield':
+        return <LlmShield />;
+      case 'imageredaction':
+        return <ImageRedaction />;
+      case 'decoyswapper':
+        return <DecoySwapper />;
       case 'logs':
         return <InterceptionLogs />;
       case 'alerts':
@@ -187,9 +197,12 @@ function CommandCenter() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-success)] pulse-glow-green" />
-            <span className="text-gray-400">ENGINE STATUS: <span className="text-white font-bold">ONLINE</span></span>
+          <div className="flex items-center gap-4">
+            <ShieldStatusBar />
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-[var(--color-success)] pulse-glow-green" />
+              <span className="text-gray-400">ENGINE STATUS: <span className="text-white font-bold">ONLINE</span></span>
+            </div>
           </div>
         </header>
 
@@ -201,9 +214,9 @@ function CommandCenter() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────
    App
-────────────────────────────────────────────────────────────────────────────── */
+──────────────────────────────────────────────────────────────────────── */
 export default function App() {
   /* Ensure the .dark class persists across any potential clearing */
   useEffect(() => {
@@ -216,7 +229,7 @@ export default function App() {
       <SecurityProvider>
         <Routes>
 
-          {/* ── Public: Login ─────────────────────────────────────────── */}
+          {/* ── Public: Login ──────────────────────────────────────── */}
           <Route
             path="/login"
             element={
@@ -226,7 +239,7 @@ export default function App() {
             }
           />
 
-          {/* ── Protected: Dashboard routes ───────────────────────────── */}
+          {/* ── Protected: Dashboard routes ────────────────────────── */}
           <Route
             path="/"
             element={
@@ -300,7 +313,7 @@ export default function App() {
             }
           />
 
-          {/* ── Fallback: redirect unknown paths to root ──────────────── */}
+          {/* ── Fallback: redirect unknown paths to root ───────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>

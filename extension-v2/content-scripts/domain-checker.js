@@ -3,9 +3,17 @@
  * Extracts the current page hostname and checks it against the
  * whitelist.json using exact matching, preventing spoofing bypass
  * techniques (e.g. domain.com.fake.com).
+ *
+ * Trust sources (merged):
+ *   1. Static config/whitelist.json — bundled with the extension.
+ *   2. Dynamic chrome.storage.local['safelens_whitelist'] — domains added
+ *      live from the dashboard's "Whitelist" quick-add button
+ *      (see ShieldStatusBar.jsx / extensionBridge.js / interceptor.js).
  */
 
 window.SafeLensDomainChecker = (function () {
+  const DYNAMIC_WHITELIST_KEY = 'SAFELENS_WHITELIST';
+
   let whitelistCache = null;
 
   async function loadWhitelist() {
@@ -14,6 +22,16 @@ window.SafeLensDomainChecker = (function () {
     const response = await fetch(url);
     whitelistCache = await response.json();
     return whitelistCache;
+  }
+
+  async function loadDynamicWhitelist() {
+    try {
+      const stored = await chrome.storage.local.get([DYNAMIC_WHITELIST_KEY]);
+      return stored[DYNAMIC_WHITELIST_KEY] || [];
+    } catch (err) {
+      console.warn('[SafeLensDomainChecker] Failed to read dynamic whitelist:', err);
+      return [];
+    }
   }
 
   function matchesPattern(hostname, pattern) {
@@ -28,8 +46,10 @@ window.SafeLensDomainChecker = (function () {
   async function isTrustedDomain() {
     const hostname = new URL(window.location.href).hostname;
     const { trustedDomains = [], trustedDomainPatterns = [] } = await loadWhitelist();
+    const dynamicDomains = await loadDynamicWhitelist();
 
-    const exactMatch = trustedDomains.includes(hostname);
+    const exactMatch =
+      trustedDomains.includes(hostname) || dynamicDomains.includes(hostname);
     const patternMatch = trustedDomainPatterns.some((p) => matchesPattern(hostname, p));
 
     return exactMatch || patternMatch;

@@ -8,7 +8,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/takedowns': {
-        target: 'https://safelens-zttx.onrender.com',
+        // 🚀 FIXED: Pointing to localhost backend instead of Render for local dev
+        target: 'http://127.0.0.1:8000',
         bypass: (req, res) => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -44,11 +45,11 @@ export default defineConfig({
         }
       },
       '/api': {
-        target: 'https://safelens-zttx.onrender.com',
+        // 🚀 FIXED: Pointing to localhost backend instead of Render
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       }
     }
   }
 })
-

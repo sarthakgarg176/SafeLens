@@ -42,10 +42,14 @@ os.makedirs(BASE_DIR / "storage/redacted", exist_ok=True) # 🚀 NEW: Directory 
 
 app.mount("/storage", StaticFiles(directory=str(BASE_DIR / "storage")), name="storage")
 
-# Deployed environment compatibility ke liye origins updated
+# 🚀 FIXED CORS: Replaced "*" with explicit origins to support allow_credentials=True
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "https://safelens-zttx.onrender.com"
+    ],
     allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
