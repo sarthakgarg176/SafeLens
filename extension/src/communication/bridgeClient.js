@@ -111,6 +111,7 @@ class BridgeClient {
 
     const strictPayload = {
       scan_id: payload?.scanId || `scan_${Date.now()}`,
+      filename: payload?.metadata?.name || payload?.fileName || 'unknown.png',
       document_context: payload?.matchedUrl || 'unknown',
       risk_score: riskScore,
       hits_count: payload?.piiCount || 0,
