@@ -23,7 +23,11 @@
     {
       "matches": [
         "*://gemini.google.com/*",
-        "*://*.gemini.google.com/*"
+        "*://*.gemini.google.com/*",
+        "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
+        "*://claude.ai/*",
+        "*://*.claude.ai/*"
       ],
       "js": [
         "content-scripts/fetch-interceptor.js"

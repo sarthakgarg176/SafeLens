@@ -23,8 +23,18 @@ PII_PATTERNS = [
     r'\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b',                    # PAN
     r'\b(?:\d[ -]*?){13,16}\b',                         # Credit Card
     r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b', # Email
-    r'\b[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}\b'        # UPI
+    r'\b[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}\b',       # UPI
+    r'\b(?:\+91[-\s]?)?[6-9]\d{9}\b'                    # Phone
 ]
+
+REGEX_REDACTION_MAP = {
+    r'\b[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4}\b': '[CVV_REDACTED]-[CVV_REDACTED]-[CVV_REDACTED]',
+    r'\b(?:\+91[-\s]?)?[6-9]\d{9}\b': '[REDACTED_PHONE]',
+    r'\b[A-Z]{5}[0-9]{4}[A-Z]\b': '[REDACTED_PAN]',
+    r'\b(?:\d[ -]*?){13,16}\b': '[REDACTED_CARD]',
+    r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b': '[REDACTED_EMAIL]',
+    r'\b[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}\b': '[REDACTED_UPI]'
+}
 
 def contains_pii(text: str) -> bool:
     if not text:
@@ -45,12 +55,16 @@ def rag_evaluator_node(state: AgentState):
     target_domain = state.get("target_domain", "untrusted_form.com")
     extracted_text = state.get("extracted_text") or state.get("raw_text") or ""
     
-    # 🚀 CHECK 1: Regex PII Scan
-    has_regex_pii = contains_pii(extracted_text)
+    # 🚀 CHECK 1: Regex PII Scan & Redaction
+    has_regex_pii = False
+    sanitized_text = extracted_text
+    for pattern, replacement in REGEX_REDACTION_MAP.items():
+        if re.search(pattern, sanitized_text, re.IGNORECASE):
+            has_regex_pii = True
+            sanitized_text = re.sub(pattern, replacement, sanitized_text, flags=re.IGNORECASE)
     
     # 🧠 CHECK 2: Contextual AI Masking (GLiNER NER + Regex Fallback)
     has_gliner_pii = False
-    sanitized_text = extracted_text
     
     if gliner_model and extracted_text:
         labels = [
@@ -157,9 +171,14 @@ def decoy_generator_node(state: AgentState):
     print("[NODE: Decoy Engine] PII Policy triggered. Synthesizing decoy payload...")
     input_data = state.get("input_data", {})
     pii_type = input_data.get("pii_type", "AADHAAR")
+    pii_type_upper = pii_type.upper()
     
     original_val = state.get("extracted_text") or state.get("raw_text") or input_data.get("text", "")
-    synthetic_val = synthesizer.synthesize(pii_type, original_val)
+    
+    if pii_type_upper == "FORM_DATA":
+        synthetic_val = original_val
+    else:
+        synthetic_val = synthesizer.synthesize(pii_type, original_val)
     
     payload = {
         "original_type": pii_type,

@@ -222,10 +222,17 @@
   // their internal state gets updated correctly along with the DOM.
   function setPromptText(el, text) {
     if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+      const fiberKey = Object.keys(el).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternals'));
       const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
-      nativeSetter.call(el, text);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      
+      if (nativeSetter) {
+        nativeSetter.call(el, text);
+        el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
+      } else {
+        el.value = text;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       return true;
     }
 
@@ -534,5 +541,90 @@
         chrome.storage.local.set({ [STORAGE_KEYS.whitelist]: whitelist }).then(replyWithStatus);
       });
     }
+  });
+
+  // ==========================================
+  // NETWORK LEVEL INTERCEPTION BRIDGE
+  // ==========================================
+  function mightContainPII(text) {
+    if (!text || text.length < 5) return false;
+    const aadhaarPattern = /\b[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4}\b/;
+    const phonePattern = /\b(?:\+91[-\s]?)?[6-9]\d{9}\b/;
+    const panPattern = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/;
+    const creditCardPattern = /\b(?:\d[ -]*?){13,16}\b/;
+    const emailPattern = /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/;
+    const upiPattern = /\b[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}\b/;
+
+    return aadhaarPattern.test(text) || 
+           phonePattern.test(text) || 
+           panPattern.test(text) || 
+           creditCardPattern.test(text) || 
+           emailPattern.test(text) || 
+           upiPattern.test(text);
+  }
+
+  async function sanitizeNestedArray(arr, redactFn) {
+    if (Array.isArray(arr)) {
+      for (let i = 0; i < arr.length; i++) {
+        if (typeof arr[i] === 'string') {
+          arr[i] = await redactFn(arr[i]);
+        } else if (typeof arr[i] === 'object' && arr[i] !== null) {
+          await sanitizeNestedArray(arr[i], redactFn);
+        }
+      }
+    } else if (typeof arr === 'object' && arr !== null) {
+      for (const key in arr) {
+        if (typeof arr[key] === 'string') {
+          arr[key] = await redactFn(arr[key]);
+        } else if (typeof arr[key] === 'object' && arr[key] !== null) {
+          await sanitizeNestedArray(arr[key], redactFn);
+        }
+      }
+    }
+  }
+
+  window.addEventListener('SAFELENS_FETCH_REQ', async (e) => {
+    const { body, url, isGemini, isChatGPT, isClaude } = e.detail || {};
+    if (!body) {
+      window.dispatchEvent(new CustomEvent('SAFELENS_FETCH_RES', { detail: { body } }));
+      return;
+    }
+
+    const redactFn = async (text) => {
+      if (!mightContainPII(text)) return text;
+      try {
+        console.log(`[${EXT_NAME}] Network interceptor - detected PII in text, requesting protection...`);
+        const response = await requestTextProtection(text);
+        if (response && response.sanitized_text) {
+          return response.sanitized_text;
+        }
+      } catch (err) {
+        console.error(`[${EXT_NAME}] Network prompt redaction failed:`, err);
+      }
+      return text;
+    };
+
+    try {
+      if (isGemini) {
+        const params = new URLSearchParams(body);
+        const freqStr = params.get('f.req');
+        if (freqStr) {
+          const freqObj = JSON.parse(freqStr);
+          await sanitizeNestedArray(freqObj, redactFn);
+          params.set('f.req', JSON.stringify(freqObj));
+          window.dispatchEvent(new CustomEvent('SAFELENS_FETCH_RES', { detail: { body: params.toString() } }));
+          return;
+        }
+      } else if (isChatGPT || isClaude) {
+        const bodyObj = JSON.parse(body);
+        await sanitizeNestedArray(bodyObj, redactFn);
+        window.dispatchEvent(new CustomEvent('SAFELENS_FETCH_RES', { detail: { body: JSON.stringify(bodyObj) } }));
+        return;
+      }
+    } catch (err) {
+      console.error(`[${EXT_NAME}] Error processing network prompt payload:`, err);
+    }
+
+    window.dispatchEvent(new CustomEvent('SAFELENS_FETCH_RES', { detail: { body } }));
   });
 })();
