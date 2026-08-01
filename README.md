@@ -24,6 +24,7 @@
 - [Problem Statement](#-problem-statement)
 - [Solution Overview](#-solution-overview)
 - [Key Features](#-key-features)
+- [📄 Abstract](#-abstract)
 - [System Architecture](#-system-architecture)
 - [Project Workflow](#-project-workflow)
 - [Technology Stack](#-technology-stack)
@@ -88,9 +89,7 @@ This entire process is designed to be seamless, requiring no changes to the dest
 # ✨ Key Features
 
 ## 🔒 AI-Powered PII Detection
-
 Automatically identifies sensitive information including:
-
 - Aadhaar Numbers
 - PAN Cards
 - Passport Numbers
@@ -103,10 +102,22 @@ using OCR and intelligent pattern matching.
 
 ---
 
+## 🤖 LLM Prompt Sanitization (AI Shield)
+Hooks into outbound requests to AI providers (e.g., ChatGPT, Gemini). 
+
+Inspects prompt text in real-time and replaces detected secrets, such as API keys and database credentials, with algorithmically generated synthetic decoys without breaking the user workflow.
+
+---
+
+## 🎣 Spoofed Website Decoy Swapper (Active Defense)
+Takes a proactive approach against phishing domains. 
+
+Intercepts form submissions on suspicious sites and replaces genuine user credentials with valid synthetic decoys (e.g., Luhn-compliant credit cards) to safely expose malicious infrastructure.
+
+---
+
 ## 🌐 Universal Upload Interception
-
 SafeLens works across almost every website supporting:
-
 - File Upload
 - Drag & Drop
 - Image Upload
@@ -117,7 +128,6 @@ without requiring website integration.
 ---
 
 ## 🛡 Automatic Redaction
-
 Sensitive information is automatically blurred or masked before upload.
 
 Users never accidentally expose confidential data.
@@ -125,15 +135,12 @@ Users never accidentally expose confidential data.
 ---
 
 ## ⚡ Real-Time Telemetry
-
 Every upload generates telemetry which is synchronized with the backend and displayed instantly on the dashboard.
 
 ---
 
 ## 📊 Enterprise Security Dashboard
-
 Security teams can monitor:
-
 - Protected Uploads
 - Active Incidents
 - Risk Scores
@@ -153,6 +160,16 @@ Implements a secure bridge between the React dashboard and Chrome Extension for 
 ## ⚙ Browser Native
 
 Built using Chrome Manifest V3 and optimized for modern Chromium-based browsers.
+
+---
+
+# 📄 Abstract
+
+SafeLens is designed to address the critical gap in modern data security: preventing zero-day privacy leaks at the client level before data transmission occurs. Our complete technical abstract details the Agentic AI architecture, OCR-based in-flight redaction pipeline, and active decoy defense mechanisms used to neutralize threats in real-time without disrupting the user workflow.
+
+**🔗 [📄 Read the Full Project Abstract (PDF)](https://drive.google.com/drive/folders/1rKYM543NOeAb1Dp2Rh8huJDpaxDbs7yp?usp=sharing)**
+
+*(Note: Access is set to 'Anyone with the link can view' for seamless evaluation)*
 
 ---
 
