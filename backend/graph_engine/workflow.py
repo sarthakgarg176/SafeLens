@@ -68,7 +68,7 @@ def rag_evaluator_node(state: AgentState):
     
     if gliner_model and extracted_text:
         labels = [
-            "password", "credential", "secret", "passcode", "API key",
+            "password", "secret", "passcode", "API key",
             "token", "secret code", "medical record id", "salary",
             "patient id", "access key", "private key", "pin code"
         ]
@@ -102,7 +102,6 @@ def rag_evaluator_node(state: AgentState):
     
     # CHECK 2b: Contextual Password & Secret Value Masker (Ensures secrets like admin_home_9981 are redacted)
     if extracted_text:
-        import re
         contextual_pattern = re.compile(
             r'(?:\[REDACTED_\w+\]|password|pwd|passcode|secret|credential)\s+(?:\w+\s+){0,5}?(\S*[A-Za-z]\S*\d\S*|\S*\d\S*[A-Za-z]\S*)',
             re.IGNORECASE
