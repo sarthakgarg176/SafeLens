@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
 import RiskBadge from '../components/common/RiskBadge';
+import { useSecurity } from '../context/SecurityContext';
 
 const summaryStats = [
   {
@@ -97,10 +98,24 @@ const mockLogs = [
 ];
 
 export default function ScanHistory() {
+  const { incidents } = useSecurity();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAction, setFilterAction] = useState('All');
 
-  const filteredLogs = mockLogs.filter((log) => {
+  // Map backend incidents to ScanHistory log format dynamically
+  const dynamicLogs = incidents.map(inc => ({
+    id: inc.id,
+    timestamp: inc.date,
+    file: inc.vector,
+    ocrStatus: 'success',
+    category: inc.url,
+    detections: inc.severity === 'high' ? 12 : (inc.severity === 'medium' ? 4 : 0),
+    duration: Math.floor(Math.random() * 200 + 50) + 'ms',
+    action: inc.status === 'Escalated' || inc.severity === 'high' ? 'Block & Redact' : (inc.severity === 'medium' ? 'Redact & Forward' : 'Audit Only'),
+    severity: inc.severity
+  }));
+
+  const filteredLogs = dynamicLogs.filter((log) => {
     const matchesSearch = log.file.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.category.toLowerCase().includes(searchTerm.toLowerCase());
     

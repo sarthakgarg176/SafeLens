@@ -49,7 +49,7 @@ export default function Popup() {
 
         // Retrieve real-time backend dashboard stats if available
         try {
-          const dashboardRes = await fetch('http://localhost:8000/api/dashboard');
+          const dashboardRes = await fetch('https://safelens-zttx.onrender.com/api/dashboard');
           if (dashboardRes.ok) {
             const result = await dashboardRes.json();
             if (result.success && result.data) {

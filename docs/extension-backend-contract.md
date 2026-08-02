@@ -55,7 +55,7 @@ Internal communication between content scripts, the decision modal popup, and th
 ### B. Backend API / Native Messaging Protocol
 For connecting with native hosts or web endpoints, SafeLens utilizes standard `fetch` HTTP POST requests.
 
-*   **URL Endpoint**: `http://localhost:8000/api/v1/scans` (or native port bindings).
+*   **URL Endpoint**: `https://safelens-zttx.onrender.com/api/v1/scans` (or native port bindings).
 *   **Payload Encoding**: JSON or `multipart/form-data`.
 *   **Default Timeout**: `5000ms`.
 
@@ -122,7 +122,7 @@ Sent immediately after a scan finishes to populate the local history dashboard.
 ```json
 {
   "success": true,
-  "fileUrl": "http://localhost:8000/uploads/secured_scan_abc123.png",
+  "fileUrl": "https://safelens-zttx.onrender.com/uploads/secured_scan_abc123.png",
   "fingerprint": {
     "phash": "9700008000800080",
     "whash": "ffffffffffffffff"

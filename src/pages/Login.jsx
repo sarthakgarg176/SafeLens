@@ -19,8 +19,6 @@ import {
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
 const DEMO_EMAIL    = 'admin@cloakai.ai';
 const DEMO_PASSWORD = 'Demo@123';
-const SESSION_KEY   = 'cloakai_session_token';
-
 
 /* ─── Floating icon card — decorative left-panel element ────────────────────── */
 function FloatCard({ icon: Icon, label, delay, className = '' }) {
@@ -79,7 +77,13 @@ export default function Login() {
     if (email.trim() === DEMO_EMAIL && password === DEMO_PASSWORD) {
       setLoading(true);
       setTimeout(() => {
-        localStorage.setItem('cloakai_session_token', 'true');
+        const token = `safelens_token_${Date.now()}`;
+        localStorage.setItem('cloakai_session_token', token);
+        
+        // Broadcast the token to the extension's content script targeting current origin
+        window.postMessage({ type: 'SAFELENS_AUTH_INIT', token }, window.location.origin);
+        console.log('Login: Auth token emitted');
+        
         Maps('/');
       }, 1000);
 

@@ -1,5 +1,26 @@
+<<<<<<< HEAD
+=======
+# Python
+venv/
+.venv/
+backend/venv/
+__pycache__/
+*.pyc
+.env
+*.db
+
+# Node
+node_modules/
+extension/node_modules/
+
+# Build
+dist/
+dist-ssr/
+*.local
+
+>>>>>>> b8e81f6c16d96beb411457d54d19ecbca96dfba7
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,6 +28,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+<<<<<<< HEAD
 node_modules
 dist
 dist-ssr
@@ -21,12 +43,19 @@ __pycache__/
 .env.*.local
 
 # Editor directories and files
+=======
+# VS Code / IDE
+>>>>>>> b8e81f6c16d96beb411457d54d19ecbca96dfba7
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
+<<<<<<< HEAD
 *.sw?
+=======
+*.sw?
+>>>>>>> b8e81f6c16d96beb411457d54d19ecbca96dfba7

@@ -16,43 +16,9 @@ import GlassCard from './common/GlassCard';
 import RiskBadge from './common/RiskBadge';
 import DataMaskViewer from './common/DataMaskViewer';
 import SecureDropzone from './common/SecureDropzone';
+import { useSecurity } from '../context/SecurityContext';
 
-const stats = [
-  {
-    title: 'Security Posture Score',
-    value: '94/100',
-    change: '+1.2% this week',
-    changeType: 'up',
-    color: 'var(--color-risk-safe)',
-    icon: ShieldCheck,
-    glow: 'neon-glow-purple'
-  },
-  {
-    title: 'Monitored Assets',
-    value: '284',
-    change: '+14 new domains',
-    changeType: 'up',
-    color: 'var(--color-risk-low)',
-    icon: Globe2
-  },
-  {
-    title: 'Active Incidents',
-    value: '3',
-    change: '2 Critical, 1 High',
-    changeType: 'danger',
-    color: 'var(--color-risk-high)',
-    icon: AlertOctagon,
-    glow: 'neon-glow-red'
-  },
-  {
-    title: 'Similarity Scans (24h)',
-    value: '48,924',
-    change: 'Normal rate',
-    changeType: 'neutral',
-    color: 'var(--color-brand-primary)',
-    icon: ScanEye
-  }
-];
+const stats = []; // keeping placeholder for backward compatibility if imported elsewhere
 
 const alerts = [
   {
@@ -97,6 +63,45 @@ const cardVariants = {
 };
 
 export default function DashboardGrid() {
+  const { incidents, takedowns, activeVectorCount } = useSecurity();
+
+  const dynamicStats = [
+    {
+      title: 'Security Posture Score',
+      value: `${Math.max(40, 100 - activeVectorCount * 5)}/100`,
+      change: activeVectorCount > 0 ? `-${activeVectorCount * 5}% threat impact` : 'Perfect state',
+      changeType: activeVectorCount > 0 ? 'danger' : 'up',
+      color: activeVectorCount > 3 ? 'var(--color-risk-high)' : (activeVectorCount > 0 ? 'var(--color-risk-medium)' : 'var(--color-risk-safe)'),
+      icon: ShieldCheck,
+      glow: activeVectorCount > 0 ? 'neon-glow-red' : 'neon-glow-purple'
+    },
+    {
+      title: 'Monitored Assets',
+      value: String(284 + incidents.length),
+      change: `+${incidents.length} logged assets`,
+      changeType: 'up',
+      color: 'var(--color-risk-low)',
+      icon: Globe2
+    },
+    {
+      title: 'Active Incidents',
+      value: String(activeVectorCount),
+      change: `${incidents.filter(i => i.severity === 'high').length} High, ${incidents.filter(i => i.severity === 'medium').length} Medium`,
+      changeType: activeVectorCount > 0 ? 'danger' : 'up',
+      color: 'var(--color-risk-high)',
+      icon: AlertOctagon,
+      glow: activeVectorCount > 0 ? 'neon-glow-red' : ''
+    },
+    {
+      title: 'Similarity Scans (24h)',
+      value: String(48924 + incidents.length),
+      change: 'Normal rate',
+      changeType: 'neutral',
+      color: 'var(--color-brand-primary)',
+      icon: ScanEye
+    }
+  ];
+
   return (
     <motion.div
       variants={containerVariants}
@@ -106,7 +111,7 @@ export default function DashboardGrid() {
     >
       {/* Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {stats.map((stat, idx) => {
+        {dynamicStats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
             <GlassCard
