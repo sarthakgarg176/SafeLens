@@ -4,11 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
-<<<<<<< HEAD
 import os
 from .database.connection import engine, Base
 from .api import health, assets, dashboard, incidents, settings, scan, protect, reports, scans
-=======
 
 from .database.connection import engine, Base
 from .api import (
@@ -22,7 +20,6 @@ from .api import (
     reports,
     scans,
 )
->>>>>>> b8e81f6c16d96beb411457d54d19ecbca96dfba7
 
 load_dotenv()
 
