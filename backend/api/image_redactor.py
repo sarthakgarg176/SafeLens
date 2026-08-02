@@ -6,9 +6,24 @@ import uuid
 import logging
 import concurrent.futures
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse, Response
 from rapidocr_onnxruntime import RapidOCR
+import time
+import json
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from database.connection import get_db
+from database.models import Incident
+
+# 🔒 Enterprise Policy Vector DB Imports
+try:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_chroma import Chroma
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+except Exception as e:
+    logging.error(f"[ERROR] Failed to load LangChain embeddings/Chroma in redactor: {e}")
+    embeddings = None
 
 # 🚀 Ultra-Fast & High-Precision YOLOv8 Engine
 try:
@@ -420,6 +435,56 @@ def extract_pii_boxes(ocr_results: list) -> list:
                 xs, ys = [p[0] for p in box], [p[1] for p in box]
                 boxes_to_redact.append({"type": pii_type, "coords": (int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys)))})
                 break
+
+    # 🚀 CHECK 2.7: Custom Enterprise Policy Terms from ChromaDB
+    enterprise_db_path = str(Path(__file__).resolve().parent.parent / "database" / "chroma_db")
+    if embeddings is not None and os.path.exists(enterprise_db_path) and parsed_lines:
+        try:
+            enterprise_db = Chroma(
+                collection_name="enterprise_policies",
+                embedding_function=embeddings,
+                persist_directory=enterprise_db_path
+            )
+            
+            # Combine all OCR lines to make a unified query text
+            full_ocr_text = " ".join([line["text"] for line in parsed_lines])
+            
+            if full_ocr_text.strip():
+                # Similarity search on enterprise policies
+                search_results = enterprise_db.similarity_search(full_ocr_text, k=3)
+                
+                # Dynamic term extraction from matched policies
+                from graph_engine.workflow import extract_forbidden_terms
+                
+                violated_terms = []
+                for doc in search_results:
+                    policy_text = doc.page_content
+                    candidate_terms = extract_forbidden_terms(policy_text)
+                    
+                    for term in candidate_terms:
+                        escaped_term = re.escape(term)
+                        pattern = rf'\b{escaped_term}\b'
+                        
+                        for item in parsed_lines:
+                            if re.search(pattern, item["text"], re.IGNORECASE):
+                                # Locate bounding box coords
+                                xs = [p[0] for p in item["box"]]
+                                ys = [p[1] for p in item["box"]]
+                                coords = (int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys)))
+                                
+                                logger.info(f"🚨 Custom Policy Violation detected in OCR: '{term}' -> redacting bounding box.")
+                                boxes_to_redact.append({
+                                    "type": "ENTERPRISE_POLICY_VIOLATION",
+                                    "coords": coords,
+                                    "term": term
+                                })
+                                violated_terms.append(term)
+                
+                if violated_terms:
+                    logger.info(f"🔒 Custom Policy Term Detections in OCR: {list(set(violated_terms))}")
+        except Exception as e:
+            logger.error(f"Failed during enterprise policy OCR check: {e}")
+
     return boxes_to_redact
 
 def extract_barcode_boxes(full_res_img: np.ndarray) -> list:
@@ -480,8 +545,13 @@ def run_ocr_pipeline(img: np.ndarray):
 THREAD_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 
 @router.post("/process-image")
-async def process_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def process_image(
+    background_tasks: BackgroundTasks, 
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
     logger.info(f"📥 Step 1/5: Received file for redaction -> '{file.filename}'")
+    start_time = time.time()
     try:
         contents = await file.read()
         nparr = np.frombuffer(contents, np.uint8)
@@ -502,6 +572,28 @@ async def process_image(background_tasks: BackgroundTasks, file: UploadFile = Fi
         text_boxes = future_text.result()
 
         pii_boxes = text_boxes + barcode_boxes + face_boxes + sig_boxes
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        # Log policy violation incident to the database if custom policy terms matched in OCR text
+        policy_violations = [box for box in text_boxes if box.get("type") == "ENTERPRISE_POLICY_VIOLATION"]
+        if policy_violations:
+            try:
+                violated_terms = list(set([box["term"] for box in policy_violations if "term" in box]))
+                new_incident = Incident(
+                    incident_type="Policy Violation (Enterprise Policy)",
+                    action_taken="Payload Sanitized / Decoy Swapped",
+                    detected_terms=json.dumps(violated_terms),
+                    severity="HIGH",
+                    latency_ms=latency_ms,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                db.add(new_incident)
+                db.commit()
+                logger.info(f"🔒 Enterprise policy violation saved (Image OCR): {violated_terms} | Latency: {latency_ms}ms")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"[ERROR] Failed to save enterprise policy violation incident (Image OCR): {e}")
+
         logger.info(f"📊 Step 4/5: Extraction Complete -> Found {len(text_boxes)} Text, {len(barcode_boxes)} Barcode, {len(face_boxes)} Face, {len(sig_boxes)} Signature.")
 
         # ✅ Handle CLEAN / NO-PII images properly

@@ -27,3 +27,7 @@ class AgentState(TypedDict, total=False):
     # 5. Telemetry & Audit Logs
     execution_status: str  # SUCCESS, WARNING, FAILED, DECOYED
     logs: List[Dict[str, Any]]  # For Dashboard Timeline streaming
+    
+    # 6. Custom Enterprise Policies Telemetry
+    enterprise_policy_violated: Optional[bool]
+    violated_terms: Optional[List[str]]

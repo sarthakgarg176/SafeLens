@@ -1,10 +1,102 @@
+import os
 import re
+from pathlib import Path
+from typing import List, Dict, Any
 from langgraph.graph import StateGraph, END
 from graph_engine.state import AgentState
 from datetime import datetime
 from decoy_synthesis.synthesizer import DecoySynthesizer
 from rag_pipeline.vector_store import PolicyVectorStore
 from gliner import GLiNER
+
+# Initialize embeddings and Chroma for enterprise_policies lookup
+try:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_chroma import Chroma
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+except Exception as e:
+    print(f"[ERROR] Failed to load LangChain embeddings/Chroma: {e}")
+    embeddings = None
+
+def extract_forbidden_terms(policy_text: str) -> List[str]:
+    """
+    Extract potential forbidden words, project names, or concepts
+    from the text of an organization's policy.
+    """
+    terms = []
+    
+    # 1. Terms in single, double, or backtick quotes, e.g. "Project Apollo", 'CTC'
+    quoted = re.findall(r'["\'`]([^"\'`]{2,})["\'`]', policy_text)
+    terms.extend(quoted)
+    
+    # 2. Capitalized phrases or proper nouns (e.g. "Project Apollo")
+    capitalized = re.findall(r'\b[A-Z][a-zA-Z0-9_-]*(?:\s+[A-Z][a-zA-Z0-9_-]*)*\b', policy_text)
+    for cap in capitalized:
+        terms.append(cap)
+        # Split and add individual words
+        words = cap.split()
+        if len(words) > 1:
+            terms.extend(words)
+            # Add all consecutive sub-sequences of length >= 2
+            for length in range(2, len(words) + 1):
+                for start in range(len(words) - length + 1):
+                    sub_seq = " ".join(words[start : start + length])
+                    terms.append(sub_seq)
+    
+    # 3. Uppercase acronyms of length 2-8 (e.g. "CTC", "PAN", "SSN")
+    acronyms = re.findall(r'\b[A-Z]{2,8}\b', policy_text)
+    terms.extend(acronyms)
+    
+    # 4. Filter and clean the terms
+    ignored_words = {
+        "Policy", "Rule", "Guidelines", "The", "A", "An", "Any", "All", 
+        "If", "Under", "DLP", "PII", "PDF", "GDPR", "ChromaDB", "FastAPI",
+        "Upload", "Compliance", "Must", "Should", "Restricted", "Confidential",
+        "Guidelines", "Uploading"
+    }
+    
+    filtered_terms = []
+    for term in terms:
+        t = term.strip()
+        # Exclude terms that are fully numeric, too short, or in our ignore list
+        if len(t) >= 2 and t not in ignored_words and not t.isdigit():
+            filtered_terms.append(t)
+            
+    # Sort by length descending so that longer phrases are matched first
+    return sorted(list(set(filtered_terms)), key=len, reverse=True)
+
+def get_replacement_placeholder(term: str, policy_text: str = "") -> str:
+    """
+    Map a forbidden term/concept to a realistic redacted placeholder
+    based on the term itself and policy context.
+    """
+    term_lower = term.lower()
+    policy_lower = policy_text.lower()
+    
+    # 1. Project/Codename mappings (Check term itself first)
+    project_keywords = {"project", "apollo", "codename", "product", "internal"}
+    if term_lower in project_keywords or any(k in term_lower for k in project_keywords):
+        return "[REDACTED_INTERNAL_PROJECT]"
+        
+    # 2. Financial mappings (Check term itself first)
+    financial_keywords = {"ctc", "salary", "compensation", "bonus", "financial", "revenue", "price", "pricing", "cost", "bank"}
+    if term_lower in financial_keywords or any(k in term_lower for k in financial_keywords):
+        return "[REDACTED_FINANCIALS]"
+        
+    # 3. PII/Identity mappings (Check term itself first)
+    pii_keywords = {"aadhaar", "pan", "ssn", "passport", "id", "card", "phone", "email", "upi"}
+    if term_lower in pii_keywords or any(k in term_lower for k in pii_keywords):
+        return "[REDACTED_PII]"
+        
+    # 4. Fallback checks on policy context
+    if any(k in policy_lower for k in ["project", "codename", "internal"]):
+        return "[REDACTED_INTERNAL_PROJECT]"
+        
+    if any(k in policy_lower for k in ["financial", "salary", "ctc", "compensation"]):
+        return "[REDACTED_FINANCIALS]"
+        
+    # Default fallback
+    return "[REDACTED_SENSITIVE]"
 
 synthesizer = DecoySynthesizer()
 vector_store = PolicyVectorStore()
@@ -133,7 +225,51 @@ def rag_evaluator_node(state: AgentState):
                 start, end = match.span()
                 sanitized_text = sanitized_text[:start] + replacement + sanitized_text[end:]
 
-    has_pii = has_regex_pii or has_gliner_pii
+    # 🧠 CHECK 2.6: Custom Enterprise Policy Terms from ChromaDB
+    has_enterprise_policy_violation = False
+    matched_enterprise_policies = []
+    violated_terms_raw = []
+    
+    enterprise_db_path = str(Path(__file__).resolve().parent.parent / "database" / "chroma_db")
+    try:
+        if os.path.exists(enterprise_db_path) and embeddings is not None and extracted_text:
+            enterprise_db = Chroma(
+                collection_name="enterprise_policies",
+                embedding_function=embeddings,
+                persist_directory=enterprise_db_path
+            )
+            
+            # Query similarity search using the user's input text
+            search_results = enterprise_db.similarity_search(extracted_text, k=3)
+            
+            violated_terms = []
+            for doc in search_results:
+                policy_text = doc.page_content
+                candidate_terms = extract_forbidden_terms(policy_text)
+                
+                # Check if any candidate term is inside our text
+                for term in candidate_terms:
+                    escaped_term = re.escape(term)
+                    pattern = rf'\b{escaped_term}\b'
+                    if re.search(pattern, sanitized_text, re.IGNORECASE):
+                        placeholder = get_replacement_placeholder(term, policy_text)
+                        sanitized_text, count = re.subn(pattern, placeholder, sanitized_text, flags=re.IGNORECASE)
+                        if count > 0:
+                            has_enterprise_policy_violation = True
+                            violated_terms.append(f"{term} -> {placeholder}")
+                            violated_terms_raw.append(term)
+                            if policy_text not in matched_enterprise_policies:
+                                matched_enterprise_policies.append(policy_text)
+                            print(f"[Enterprise Policy Match] Redacted term '{term}' with '{placeholder}' based on policy: '{policy_text[:100]}...'")
+            
+            if has_enterprise_policy_violation:
+                print(f"[Enterprise Policy Scan] Redacted violated terms: {violated_terms}")
+        else:
+            print("[Enterprise Policy Scan] enterprise_policies ChromaDB not found or not initialized.")
+    except Exception as e:
+        print(f"[ERROR] Failed to run Enterprise Policy check on ChromaDB: {e}")
+
+    has_pii = has_regex_pii or has_gliner_pii or has_enterprise_policy_violation
 
     # Clean text check
     if not has_pii:
@@ -143,6 +279,8 @@ def rag_evaluator_node(state: AgentState):
             "is_safe": True,
             "confidence_score": 1.0,
             "extracted_text": sanitized_text,
+            "enterprise_policy_violated": False,
+            "violated_terms": [],
             "logs": state.get("logs", []) + [{"step": "RAG_EVALUATION", "result": "CLEAN_TEXT"}]
         }
 
@@ -158,11 +296,24 @@ def rag_evaluator_node(state: AgentState):
     
     is_safe = (action == "PASS") or ("internal" in target_domain.lower())
     
+    # If custom enterprise policy was violated, append it to the matched context
+    if has_enterprise_policy_violation:
+        custom_docs = "; ".join(matched_enterprise_policies)
+        if matched_doc:
+            matched_doc = f"Custom Enterprise Policy Violation: ({custom_docs}) | Whitelist Policy: {matched_doc}"
+        else:
+            matched_doc = f"Custom Enterprise Policy Violation: {custom_docs}"
+        # Trigger decoy generation path (is_safe becomes False unless target domain is explicitly whitelisted as internal)
+        if not ("internal" in target_domain.lower() or action == "PASS"):
+            is_safe = False
+            
     return {
         "rag_context_matched": matched_doc,
         "is_safe": is_safe,
         "confidence_score": 0.95,
         "extracted_text": sanitized_text,
+        "enterprise_policy_violated": has_enterprise_policy_violation,
+        "violated_terms": list(set(violated_terms_raw)),
         "logs": state.get("logs", []) + [{"step": "RAG_EVALUATION", "result": "WHITELISTED" if is_safe else "UNTRUSTED"}]
     }
 
@@ -174,7 +325,7 @@ def decoy_generator_node(state: AgentState):
     
     original_val = state.get("extracted_text") or state.get("raw_text") or input_data.get("text", "")
     
-    if pii_type_upper == "FORM_DATA":
+    if pii_type_upper in ["FORM_DATA", "FILE_UPLOAD", "TEXT", "TEXT_PAYLOAD"]:
         synthetic_val = original_val
     else:
         synthetic_val = synthesizer.synthesize(pii_type, original_val)

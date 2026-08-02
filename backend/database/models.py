@@ -49,3 +49,13 @@ class Action(Base):
     status = Column(String, default="Pending")
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     alert = relationship("Alert", back_populates="action")
+
+class Incident(Base):
+    __tablename__ = "incidents"
+    id = Column(Integer, primary_key=True, index=True)
+    incident_type = Column(String, nullable=False)
+    action_taken = Column(String, nullable=False)
+    detected_terms = Column(String, nullable=True)  # JSON-serialized list of matched terms
+    severity = Column(String, nullable=False)
+    latency_ms = Column(Integer, nullable=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))

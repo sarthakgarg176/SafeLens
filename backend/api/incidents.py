@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from database.connection import get_db
-from database.models import Alert, Asset
+from database.models import Alert, Asset, Incident
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -22,27 +22,67 @@ class IncidentCreate(BaseModel):
 @router.get("", response_model=List[Dict[str, Any]])
 def get_incidents(db: Session = Depends(get_db)):
     """
-    Returns unified interception logs for LLM Shield and Decoy Swapper.
-    Queries database alerts with fallback to real-time structured logs.
+    Returns unified interception logs for LLM Shield, Decoy Swapper, and Custom Enterprise Policies.
+    Queries database alerts and custom policy incidents, returning them sorted by newest first.
     """
     try:
         alerts = db.query(Alert).order_by(Alert.timestamp.desc()).limit(50).all()
-        if alerts and len(alerts) > 0:
-            formatted_logs = []
-            for alert in alerts:
-                formatted_logs.append({
-                    "id": f"SCAN-{alert.id}",
-                    "date": alert.timestamp.strftime("%b %d, %H:%M:%S") if alert.timestamp else datetime.now().strftime("%b %d, %H:%M:%S"),
-                    "vector": alert.matched_url or "api.openai.com/v1/chat",
-                    "url": "PII / Credentials",
-                    "severity": alert.severity.lower() if alert.severity else "high",
-                    "status": alert.status or "Escalated",
-                    "metadata": {
-                        "originalPayload": "{\n  \"prompt\": \"Sensitive PII or Token detected in flight...\"\n}",
-                        "decoyPayload": "{\n  \"prompt\": \"[REDACTED_SYNTHETIC_DECOY] Swapped safely by SafeLens Shield.\"\n}"
-                    }
-                })
-            return formatted_logs
+        incidents = db.query(Incident).order_by(Incident.timestamp.desc()).limit(50).all()
+        
+        all_entries = []
+        
+        # 1. Format legacy alerts
+        for alert in alerts:
+            all_entries.append({
+                "id": f"SCAN-{alert.id}",
+                "timestamp_raw": alert.timestamp,
+                "date": alert.timestamp.strftime("%b %d, %H:%M:%S") if alert.timestamp else datetime.now().strftime("%b %d, %H:%M:%S"),
+                "vector": alert.matched_url or "api.openai.com/v1/chat",
+                "url": "PII / Credentials",
+                "severity": alert.severity.lower() if alert.severity else "high",
+                "status": alert.status or "Escalated",
+                "metadata": {
+                    "originalPayload": "{\n  \"prompt\": \"Sensitive PII or Token detected in flight...\"\n}",
+                    "decoyPayload": "{\n  \"prompt\": \"[REDACTED_SYNTHETIC_DECOY] Swapped safely by SafeLens Shield.\"\n}"
+                }
+            })
+            
+        # 2. Format enterprise policy incidents
+        for inc in incidents:
+            import json
+            try:
+                terms_list = json.loads(inc.detected_terms) if inc.detected_terms else []
+            except:
+                terms_list = []
+            terms_str = ", ".join(terms_list)
+            
+            all_entries.append({
+                "id": f"INC-{inc.id}",
+                "timestamp_raw": inc.timestamp,
+                "date": inc.timestamp.strftime("%b %d, %H:%M:%S") if inc.timestamp else datetime.now().strftime("%b %d, %H:%M:%S"),
+                "vector": "Enterprise Policy Engine",
+                "url": "Policy Violation (Enterprise Policy)",
+                "severity": inc.severity.lower() if inc.severity else "high",
+                "status": "Blocked",
+                "metadata": {
+                    "incident_type": inc.incident_type,
+                    "action_taken": inc.action_taken,
+                    "detected_terms": terms_list,
+                    "latency_ms": inc.latency_ms,
+                    "matched_terms_detail": f"Matched terms: {terms_str}"
+                }
+            })
+            
+        # Sort combined list by timestamp raw descending (newest first)
+        all_entries.sort(key=lambda x: x["timestamp_raw"] or datetime.min, reverse=True)
+        
+        # Strip the sorting helper key before sending back
+        for entry in all_entries:
+            entry.pop("timestamp_raw", None)
+            
+        if len(all_entries) > 0:
+            return all_entries[:50]
+            
     except Exception as e:
         print(f"[Incidents API] Database query fallback triggered: {e}")
 

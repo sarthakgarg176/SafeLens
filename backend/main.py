@@ -6,8 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from pathlib import Path
 from database.connection import engine, Base
+from database.models import Incident
 
-# Import all existing routers + the NEW image_redactor router
+# Import all existing routers + the NEW image_redactor and policies routers
 from api import (
     health,
     assets,
@@ -20,7 +21,8 @@ from api import (
     scans,
     websocket,
     process_upload,
-    image_redactor  # 🚀 NEW: Standalone OCR + LLM Redaction Router
+    image_redactor,  # 🚀 NEW: Standalone OCR + LLM Redaction Router
+    policies         # 🔒 NEW: Policy Ingestion Router
 )
 
 load_dotenv()
@@ -81,3 +83,6 @@ app.include_router(process_upload.router, prefix="/api")
 
 # 🚀 NEW: Mount the Enterprise DLP Image Redaction route
 app.include_router(image_redactor.router, prefix="/api")
+
+# 🔒 NEW: Mount the Policy Ingestion route
+app.include_router(policies.router, prefix="/api")
